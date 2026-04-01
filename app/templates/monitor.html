@@ -1,0 +1,313 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitor — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-uid="{{ user.id if user else 1 }}">
+
+<div class="app-layout">
+  {{ sidebar(user, 'monitor', 'supervisor') }}
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">📡 Live Monitor</div>
+      <div class="topbar-right">
+        <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);"></span>
+        <span style="font-family:var(--font-m);font-size:10px;color:var(--green);display:flex;align-items:center;gap:5px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite;display:inline-block;"></span>
+          AUTO-REFRESH 30s
+        </span>
+        <button class="btn btn-outline btn-sm" onclick="loadAll()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="page">
+
+      <!-- KPI row -->
+      <div class="stats-row">
+        <div class="stat-card fade-up">
+          <div class="stat-lbl">Total Workers</div>
+          <div class="stat-val">{{ workers|length }}</div>
+          <div class="stat-sub">Registered on site</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--green)">
+          <div class="stat-lbl">Activities</div>
+          <div class="stat-val">{{ activities|length }}</div>
+          <div class="stat-sub">Being monitored</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--accent2)">
+          <div class="stat-lbl">Updates Today</div>
+          <div class="stat-val" id="today-count">—</div>
+          <div class="stat-sub">Field submissions</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--red)">
+          <div class="stat-lbl">Active Issues</div>
+          <div class="stat-val" id="issue-count" style="color:var(--red)">—</div>
+          <div class="stat-sub">Reported problems</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--orange)">
+          <div class="stat-lbl">Downtime Events</div>
+          <div class="stat-val" id="downtime-count" style="color:var(--orange)">—</div>
+          <div class="stat-sub">Equipment / low-hrs</div>
+        </div>
+      </div>
+
+      <div class="g2">
+        <!-- Live activity feed -->
+        <div class="card fade-up">
+          <div class="card-title">📋 Live Activity Feed</div>
+          <div class="card-sub">Latest worker submissions — real time</div>
+          <div id="feed-list" style="max-height:380px;overflow-y:auto;">
+            <div style="text-align:center;color:var(--text3);padding:24px;">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Worker status -->
+        <div class="card fade-up">
+          <div class="card-title">👷 Worker Status</div>
+          <div class="card-sub">Productivity summary per worker</div>
+          <div id="worker-status">
+            <div style="text-align:center;color:var(--text3);padding:24px;">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="g2 mt5">
+        <div class="card fade-up">
+          <div class="card-title">📈 Hourly Work Distribution</div>
+          <div class="card-sub">Hours logged per activity</div>
+          <canvas id="hoursChart" style="max-height:220px;"></canvas>
+        </div>
+        <div class="card fade-up">
+          <div class="card-title">⚠️ Issue Breakdown</div>
+          <div class="card-sub">Types of issues reported</div>
+          <canvas id="issueChart" style="max-height:220px;"></canvas>
+        </div>
+      </div>
+
+      <!-- Full updates table -->
+      <div class="card mt5 fade-up">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div>
+            <div class="card-title">📊 All Worker Updates</div>
+            <div class="card-sub">Complete field submissions log</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="filter-activity" class="form-select" style="width:180px;padding:5px 10px;font-size:12px;">
+              <option value="">All Activities</option>
+              {% for a in activities %}
+              <option value="{{ a.id }}">{{ a.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr>
+              <th>Worker</th><th>Activity</th><th>Work Type</th>
+              <th>Qty</th><th>Hours</th><th>Crew</th>
+              <th>Weather</th><th>Issue</th><th>Time</th>
+            </tr></thead>
+            <tbody id="updates-tbody">
+              <tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.feed-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.feed-item:last-child{border-bottom:none}
+.feed-dot{
+  width:8px;height:8px;border-radius:50%;
+  flex-shrink:0;margin-top:5px;
+}
+</style>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+var hoursInst, issueInst;
+
+setInterval(function() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN',{hour12:false}) + ' IST';
+}, 1000);
+
+document.getElementById('filter-activity').addEventListener('change', function() {
+  loadUpdatesTable(this.value);
+});
+
+async function loadAll() {
+  await Promise.all([loadFeed(), loadWorkerStatus(), loadCharts(), loadUpdatesTable('')]);
+}
+
+async function loadFeed() {
+  var updates = await fetch('/api/updates?limit=100').then(function(r){return r.json();});
+
+  /* KPI counts */
+  var today = new Date().toISOString().slice(0,10);
+  var todayUpdates = updates.filter(function(u){ return u.timestamp.slice(0,10)===today; });
+  document.getElementById('today-count').textContent = todayUpdates.length;
+  document.getElementById('issue-count').textContent =
+    updates.filter(function(u){ return u.issue_type && u.issue_type.toLowerCase()!=='none'; }).length;
+  document.getElementById('downtime-count').textContent =
+    updates.filter(function(u){ return u.hours_worked < 4 || (u.issue_type && u.issue_type.toLowerCase().includes('equipment')); }).length;
+
+  /* Feed */
+  var cont = document.getElementById('feed-list');
+  if (!updates.length) {
+    cont.innerHTML = '<p style="color:var(--text3);padding:16px;font-size:13px;">No updates yet. Run seed.py to add demo data.</p>';
+    return;
+  }
+  var wx = {'Clear':'☀️','Cloudy':'☁️','Rain':'🌧️','Heavy Rain':'⛈️','Fog':'🌫️','Extreme Heat':'🔥'};
+  cont.innerHTML = updates.slice(0,20).map(function(u) {
+    var hasIssue = u.issue_type && u.issue_type.toLowerCase() !== 'none';
+    var col = hasIssue ? 'var(--red)' : 'var(--green)';
+    return '<div class="feed-item">' +
+      '<div class="feed-dot" style="background:' + col + ';box-shadow:0 0 5px ' + col + ';"></div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;">' + u.worker_name +
+          ' <span style="font-size:11px;color:var(--text3);font-weight:400;">· ' + u.work_type + '</span></div>' +
+        '<div style="font-family:var(--font-m);font-size:11px;color:var(--accent);margin-top:2px;">' +
+          u.quantity_done + u.quantity_unit + ' · ' + u.hours_worked + 'h' +
+          ' · ' + (wx[u.weather_condition] || '🌡️') + ' ' + u.weather_condition +
+        '</div>' +
+        (hasIssue ? '<div style="font-size:11px;color:var(--red);margin-top:2px;">⚠ ' + u.issue_type + '</div>' : '') +
+      '</div>' +
+      '<div style="font-family:var(--font-m);font-size:10px;color:var(--text3);flex-shrink:0;">' +
+        new Date(u.timestamp).toLocaleDateString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function loadWorkerStatus() {
+  var updates = await fetch('/api/updates?limit=500').then(function(r){return r.json();});
+  var bw = {};
+  updates.forEach(function(u) {
+    if (!bw[u.worker_name]) bw[u.worker_name] = {qty:0,hours:0,issues:0,count:0};
+    bw[u.worker_name].qty   += u.quantity_done;
+    bw[u.worker_name].hours += u.hours_worked;
+    bw[u.worker_name].count++;
+    if (u.issue_type && u.issue_type.toLowerCase()!=='none') bw[u.worker_name].issues++;
+  });
+  var sorted = Object.entries(bw).sort(function(a,b){return b[1].qty-a[1].qty;});
+  var colors = ['#F59E0B','#3B82F6','#10B981','#8B5CF6','#EF4444','#06B6D4','#EC4899','#14B8A6'];
+  var cont = document.getElementById('worker-status');
+  if (!sorted.length) {
+    cont.innerHTML='<p style="color:var(--text3);padding:16px;">No worker data yet.</p>';
+    return;
+  }
+  cont.innerHTML = sorted.map(function(entry, i) {
+    var name=entry[0], s=entry[1];
+    var eff = s.hours>0?(s.qty/s.hours).toFixed(1):0;
+    var issueRate = s.count>0?Math.round(s.issues/s.count*100):0;
+    var barCol = issueRate>30?'var(--red)':issueRate>10?'var(--orange)':'var(--green)';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);">' +
+      '<div class="avatar" style="background:'+colors[i%colors.length]+';width:28px;height:28px;font-size:11px;border-radius:7px;">'+name[0].toUpperCase()+'</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+name+'</div>' +
+        '<div class="pbar" style="height:4px;margin-top:5px;"><div class="pbar-fill" style="width:'+Math.min(issueRate*2,100)+'%;background:'+barCol+';"></div></div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0;">' +
+        '<div style="font-family:var(--font-m);font-size:11px;color:var(--accent);">'+eff+' qty/h</div>' +
+        '<div style="font-family:var(--font-m);font-size:10px;color:var(--text3);">'+s.count+' updates</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function loadCharts() {
+  var updates = await fetch('/api/updates?limit=500').then(function(r){return r.json();});
+
+  /* Hours by activity */
+  var byAct = {};
+  updates.forEach(function(u){
+    var key = 'Activity #'+u.activity_id;
+    byAct[key] = (byAct[key]||0) + u.hours_worked;
+  });
+  var actLabels = Object.keys(byAct);
+  var actData   = Object.values(byAct);
+
+  if (hoursInst) hoursInst.destroy();
+  hoursInst = new Chart(document.getElementById('hoursChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:actLabels,datasets:[{
+      data:actData,
+      backgroundColor:'rgba(59,130,246,.5)',borderColor:'#3B82F6',borderWidth:2,borderRadius:6
+    }]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#71717A',font:{size:10}},grid:{color:'rgba(255,255,255,.03)'}},
+              y:{ticks:{color:'#71717A'},grid:{color:'rgba(255,255,255,.03)'}}}}
+  });
+
+  /* Issues pie */
+  var issueMap = {};
+  updates.forEach(function(u){
+    if (u.issue_type && u.issue_type.toLowerCase()!=='none')
+      issueMap[u.issue_type] = (issueMap[u.issue_type]||0)+1;
+  });
+  var iLabels = Object.keys(issueMap);
+  var iData   = Object.values(issueMap);
+  var iColors = ['#EF4444','#F59E0B','#8B5CF6','#06B6D4','#10B981'];
+
+  if (issueInst) issueInst.destroy();
+  if (iLabels.length) {
+    issueInst = new Chart(document.getElementById('issueChart').getContext('2d'),{
+      type:'doughnut',
+      data:{labels:iLabels,datasets:[{data:iData,backgroundColor:iColors,borderWidth:0}]},
+      options:{responsive:true,plugins:{legend:{labels:{color:'#A1A1AA',font:{size:11}}}}}
+    });
+  } else {
+    document.getElementById('issueChart').parentElement.innerHTML +=
+      '<p style="text-align:center;color:var(--green);font-size:13px;margin-top:12px;">✅ No issues reported!</p>';
+  }
+}
+
+async function loadUpdatesTable(actId) {
+  var url = '/api/updates?limit=100' + (actId ? '&activity_id='+actId : '');
+  var updates = await fetch(url).then(function(r){return r.json();});
+  var tbody = document.getElementById('updates-tbody');
+  if (!updates.length) {
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px;">No updates found.</td></tr>';
+    return;
+  }
+  var wx={'Clear':'☀️','Cloudy':'☁️','Rain':'🌧️','Heavy Rain':'⛈️','Fog':'🌫️','Extreme Heat':'🔥'};
+  tbody.innerHTML = updates.map(function(u){
+    var hasIssue = u.issue_type && u.issue_type.toLowerCase()!=='none';
+    return '<tr>'+
+      '<td style="font-weight:600;">'+u.worker_name+'</td>'+
+      '<td style="font-family:var(--font-m);font-size:11px;color:var(--text3);">#'+u.activity_id+'</td>'+
+      '<td style="font-size:12px;">'+u.work_type+'</td>'+
+      '<td style="font-family:var(--font-m);color:var(--accent);">'+u.quantity_done+u.quantity_unit+'</td>'+
+      '<td style="font-family:var(--font-m);">'+u.hours_worked+'h</td>'+
+      '<td style="font-family:var(--font-m);">'+u.crew_size+'</td>'+
+      '<td>'+(wx[u.weather_condition]||'🌡️')+' '+u.weather_condition+'</td>'+
+      '<td>'+(hasIssue?'<span class="badge badge-red">⚠ '+u.issue_type.substr(0,16)+'</span>':'<span class="badge badge-green">✓ Clear</span>')+'</td>'+
+      '<td style="font-size:11px;color:var(--text3);font-family:var(--font-m);">'+
+        new Date(u.timestamp).toLocaleDateString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

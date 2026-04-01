@@ -1,0 +1,221 @@
+{% macro sidebar(user, active, role) %}
+<div class="sidebar">
+
+  <!-- Logo -->
+  <div class="sidebar-logo">
+    <div class="logo-brand">
+      <div class="logo-mark">CE</div>
+      <div>
+        <div style="font-family:var(--font-d);font-size:14px;font-weight:800;color:var(--text);line-height:1.2;">Construction Ease</div>
+        <div class="logo-sub">Digital Twin v3</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <nav class="sidebar-nav">
+
+    {% if role == 'supervisor' %}
+
+    <div class="nav-label">Overview</div>
+
+    <a href="/supervisor-dashboard?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'dashboard' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span>Dashboard</span>
+    </a>
+
+    <a href="/command-center?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'command' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+      </svg>
+      <span>Command Center</span>
+      <span class="nav-tag nav-tag-blue">Live</span>
+    </a>
+
+    <a href="/monitor?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'monitor' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      <span>Monitor</span>
+    </a>
+
+    <div class="nav-label">Analysis</div>
+
+    <a href="/digital-twin-page?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'twin' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+      <span>Digital Twin</span>
+    </a>
+
+    <a href="/gantt?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'gantt' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6"  x2="9"  y2="6"/>
+        <line x1="3" y1="10" x2="13" y2="10"/>
+        <line x1="3" y1="14" x2="11" y2="14"/>
+        <line x1="3" y1="18" x2="17" y2="18"/>
+        <rect x="9"  y="4"  width="6" height="4" rx="1"/>
+        <rect x="13" y="8"  width="8" height="4" rx="1"/>
+        <rect x="11" y="12" width="7" height="4" rx="1"/>
+        <rect x="17" y="16" width="4" height="4" rx="1"/>
+      </svg>
+      <span>Gantt Chart</span>
+    </a>
+
+    <a href="/analytics?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'analytics' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <span>Analytics EVM</span>
+    </a>
+
+    <div class="nav-label">Operations</div>
+
+    <a href="/handover?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'handover' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 1l4 4-4 4"/>
+        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+        <path d="M7 23l-4-4 4-4"/>
+        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+      </svg>
+      <span>Shift Handover</span>
+    </a>
+
+    <a href="/dews-dashboard?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'dews' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <span>DEWS Monitor</span>
+      <span class="nav-tag nav-tag-blue">Sec</span>
+    </a>
+
+    <a href="/elis?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'elis' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      <span>ELIS Log</span>
+    </a>
+
+    <div class="nav-label">Account</div>
+
+    <a href="/profile?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'profile' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      <span>Profile</span>
+    </a>
+
+    <a href="/logout" class="nav-link">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      <span>Logout</span>
+    </a>
+
+    {% else %}
+
+    <!-- Worker nav -->
+    <div class="nav-label">My Work</div>
+
+    <a href="/worker-dashboard?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'dashboard' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span>Dashboard</span>
+    </a>
+
+    <a href="/smart-update?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'smart' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+      <span>Smart Update AI</span>
+      <span class="nav-tag nav-tag-blue">AI</span>
+    </a>
+
+    <a href="/update-work?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'update' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      <span>Manual Update</span>
+    </a>
+
+    <div class="nav-label">Operations</div>
+
+    <a href="/handover?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'handover' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 1l4 4-4 4"/>
+        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+        <path d="M7 23l-4-4 4-4"/>
+        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+      </svg>
+      <span>Shift Handover</span>
+    </a>
+
+    <div class="nav-label">Account</div>
+
+    <a href="/profile?user_id={{ user.id if user else 1 }}"
+       class="nav-link {% if active == 'profile' %}active{% endif %}">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      <span>Profile</span>
+    </a>
+
+    <a href="/logout" class="nav-link">
+      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      <span>Logout</span>
+    </a>
+
+    {% endif %}
+
+  </nav>
+
+  <!-- User footer -->
+  <div class="sidebar-footer">
+    <div class="user-mini">
+      <div class="avatar" style="background-color:{{ user.avatar_color if user and user.avatar_color else '#2563EB' }};">
+        {{ user.name[0].upper() if user else '?' }}
+      </div>
+      <div class="user-mini-info">
+        <div class="user-mini-name">{{ user.name if user else 'User' }}</div>
+        <div class="user-mini-role">{{ user.role if user else 'worker' }}</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endmacro %}

@@ -1,0 +1,248 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Submit Update — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-uid="{{ user.id if user else 1 }}"
+      data-uname="{{ user.name if user else 'Worker' }}"
+      data-role="{{ user.role if user else 'worker' }}">
+
+<div class="app-layout">
+  {{ sidebar(user, 'update', user.role if user else 'worker') }}
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">📝 Submit Work Update</div>
+      <div class="topbar-right">
+        <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);"></span>
+      </div>
+    </div>
+
+    <div class="page">
+
+      {% if request.query_params.get('success') %}
+      <div class="alert-strip success">✅ Update submitted successfully!</div>
+      {% endif %}
+      {% if request.query_params.get('error') %}
+      <div class="alert-strip error">❌ {{ request.query_params.get('error') }}</div>
+      {% endif %}
+
+      <div class="g2">
+
+        <!-- Form -->
+        <div class="card fade-up">
+          <div class="card-title">📋 Field Update Form</div>
+          <div class="card-sub">Submit your daily work progress</div>
+
+          <form method="POST" action="/worker-update" id="update-form">
+            <input type="hidden" name="user_id" id="f-uid" value="{{ user.id if user else 1 }}">
+
+            <div class="form-group">
+              <label class="form-label">Worker Name</label>
+              <input class="form-input" type="text" name="worker_name"
+                     value="{{ user.name if user else '' }}" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Activity</label>
+              <select class="form-select" name="activity_id" required>
+                <option value="">— Select Activity —</option>
+                {% for a in activities %}
+                <option value="{{ a.id }}">{{ a.name }} ({{ a.activity_type }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Work Type</label>
+              <select class="form-select" name="work_type" required>
+                <option value="">— Select —</option>
+                <option>TBM Advance</option>
+                <option>Excavation</option>
+                <option>Concrete Pouring</option>
+                <option>Rebar Fixing</option>
+                <option>Pile Boring</option>
+                <option>Shuttering</option>
+                <option>Survey</option>
+                <option>Inspection</option>
+                <option>Waterproofing</option>
+                <option>Backfilling</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Work Description</label>
+              <textarea class="form-textarea" name="work_description"
+                        placeholder="Describe the work done today…" rows="3"></textarea>
+            </div>
+
+            <div class="g2" style="gap:12px;">
+              <div class="form-group">
+                <label class="form-label">Quantity Done</label>
+                <input class="form-input" type="number" name="quantity_done"
+                       step="0.01" min="0" placeholder="e.g. 12.5" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Unit</label>
+                <select class="form-select" name="quantity_unit">
+                  <option>m</option>
+                  <option>km</option>
+                  <option>m3</option>
+                  <option>MT</option>
+                  <option>no</option>
+                  <option>kg</option>
+                  <option>sqm</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="g2" style="gap:12px;">
+              <div class="form-group">
+                <label class="form-label">Hours Worked</label>
+                <input class="form-input" type="number" name="hours_worked"
+                       step="0.5" min="0" max="24" placeholder="e.g. 8" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Crew Size</label>
+                <input class="form-input" type="number" name="crew_size"
+                       min="1" max="100" placeholder="e.g. 10" value="5">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Weather Condition</label>
+              <select class="form-select" name="weather_condition">
+                <option>Clear</option>
+                <option>Cloudy</option>
+                <option>Rain</option>
+                <option>Heavy Rain</option>
+                <option>Fog</option>
+                <option>Extreme Heat</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Issue Reported</label>
+              <select class="form-select" name="issue_type" id="issue-select">
+                <option value="None">None — No Issues</option>
+                <option value="Equipment Breakdown">Equipment Breakdown</option>
+                <option value="Material Delay">Material Delay</option>
+                <option value="Labour Shortage">Labour Shortage</option>
+                <option value="Safety Concern">Safety Concern</option>
+                <option value="Weather">Weather Delay</option>
+                <option value="Design Change">Design Change</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="safety-row">
+              <label class="form-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" name="safety_ok" value="true" checked
+                       style="width:16px;height:16px;accent-color:var(--green);">
+                <span>Safety checks passed for today</span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;">
+              ✅ Submit Update
+            </button>
+          </form>
+        </div>
+
+        <!-- Right panel -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+
+          <!-- Shift indicator -->
+          <div class="card fade-up">
+            <div class="card-title">⏰ Current Shift</div>
+            <div class="card-sub">Auto-detected from system time</div>
+            <div style="text-align:center;padding:16px 0;">
+              <div id="shift-badge" style="font-family:var(--font-d);font-size:22px;font-weight:800;"></div>
+              <div id="shift-time" style="font-family:var(--font-m);font-size:11px;color:var(--text3);margin-top:6px;"></div>
+            </div>
+          </div>
+
+          <!-- My recent updates -->
+          <div class="card fade-up">
+            <div class="card-title">🕑 My Recent Submissions</div>
+            <div class="card-sub">Last 5 updates</div>
+            <div id="recent-updates">
+              <div style="color:var(--text3);font-size:13px;padding:8px 0;">Loading…</div>
+            </div>
+          </div>
+
+          <!-- Tips -->
+          <div class="card fade-up" style="background:rgba(245,166,35,.04);border-color:rgba(245,166,35,.2);">
+            <div class="card-title" style="color:var(--accent);">💡 Tips</div>
+            <ul style="font-size:12px;color:var(--text3);line-height:2;padding-left:16px;margin-top:8px;">
+              <li>Submit updates at end of each shift</li>
+              <li>Always report issues — even minor ones</li>
+              <li>Accurate qty helps the Digital Twin</li>
+              <li>Use ✦ AI Update for voice/text input</li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+
+/* Clock */
+setInterval(function() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN', {hour12:false}) + ' IST';
+}, 1000);
+
+/* Shift badge */
+var h = new Date().getHours();
+var shift, shiftColor, shiftTime;
+if (h >= 6 && h < 14) {
+  shift='🌅 Morning Shift'; shiftColor='var(--accent)'; shiftTime='06:00 – 14:00';
+} else if (h >= 14 && h < 22) {
+  shift='☀️ Day Shift'; shiftColor='var(--accent2)'; shiftTime='14:00 – 22:00';
+} else {
+  shift='🌙 Night Shift'; shiftColor='var(--purple)'; shiftTime='22:00 – 06:00';
+}
+document.getElementById('shift-badge').textContent = shift;
+document.getElementById('shift-badge').style.color = shiftColor;
+document.getElementById('shift-time').textContent = shiftTime;
+
+/* Load recent updates */
+fetch('/api/updates?limit=5&worker_name=' + encodeURIComponent(document.body.dataset.uname))
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    var cont = document.getElementById('recent-updates');
+    if (!data.length) {
+      cont.innerHTML = '<p style="color:var(--text3);font-size:12px;">No submissions yet.</p>';
+      return;
+    }
+    cont.innerHTML = data.slice(0,5).map(function(u) {
+      var hasIssue = u.issue_type && u.issue_type.toLowerCase() !== 'none';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);">' +
+        '<div>' +
+          '<div style="font-size:12px;font-weight:600;">' + u.work_type + '</div>' +
+          '<div style="font-family:var(--font-m);font-size:10px;color:var(--text3);">' +
+            u.quantity_done + u.quantity_unit + ' · ' + u.hours_worked + 'h' +
+          '</div>' +
+        '</div>' +
+        '<span class="badge ' + (hasIssue ? 'badge-red' : 'badge-green') + '" style="font-size:9px;">' +
+          (hasIssue ? '⚠' : '✓') +
+        '</span>' +
+      '</div>';
+    }).join('');
+  })
+  .catch(function(){ document.getElementById('recent-updates').innerHTML='<p style="color:var(--text3);font-size:12px;">Could not load.</p>'; });
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ELIS Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0f1e; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; padding: 24px; }
+    h1 { color: #22d3ee; font-size: 1.6rem; margin-bottom: 20px; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; }
+    .stat-card .num { font-size: 2rem; font-weight: bold; }
+    .stat-card .lbl { color: #6b7280; font-size: 0.8rem; margin-top: 4px; }
+    .cyan  { color: #22d3ee; }
+    .red   { color: #ef4444; }
+    .amber { color: #f59e0b; }
+    .green { color: #22c55e; }
+
+    .grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; }
+    .card h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin-bottom: 12px; }
+
+    .event-stream { max-height: 300px; overflow-y: auto; }
+    .event-row { display: grid; grid-template-columns: 80px 20px 160px 1fr auto; gap: 8px;
+                 align-items: start; padding: 6px 0; border-bottom: 1px solid #1f2937;
+                 font-family: monospace; font-size: 0.78rem; }
+    .event-row .time { color: #4b5563; }
+    .event-row .type { color: #c084fc; }
+    .event-row .msg  { color: #d1d5db; }
+    .ml-badge { background: #1f2937; color: #22d3ee; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; white-space: nowrap; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { color: #6b7280; font-size: 0.7rem; text-transform: uppercase; text-align: left;
+         padding: 8px 12px; border-bottom: 1px solid #1f2937; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1f2937; }
+    .badge { padding: 3px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: bold; }
+    .HIGH     { background: #450a0a; color: #fca5a5; }
+    .ELEVATED { background: #431407; color: #fdba74; }
+    .MEDIUM   { background: #422006; color: #fcd34d; }
+    .LOW      { background: #052e16; color: #86efac; }
+
+    .btn-row { display: flex; gap: 12px; margin-top: 20px; }
+    button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+    .btn-train   { background: #7c3aed; color: white; }
+    .btn-refresh { background: #374151; color: white; }
+    button:hover { opacity: 0.85; }
+
+    .filter-row { display: flex; gap: 10px; margin-bottom: 12px; }
+    select { background: #1f2937; color: #e2e8f0; border: 1px solid #374151;
+             padding: 6px 10px; border-radius: 6px; font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+
+<h1>⚡ ELIS — Event Log &amp; Intelligence System</h1>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card"><div class="num cyan"  id="stat-total">—</div><div class="lbl">Total Events</div></div>
+  <div class="stat-card"><div class="num red"   id="stat-critical">—</div><div class="lbl">Critical</div></div>
+  <div class="stat-card"><div class="num amber" id="stat-warning">—</div><div class="lbl">Warnings</div></div>
+  <div class="stat-card"><div class="num green" id="stat-normal">—</div><div class="lbl">Normal (ML)</div></div>
+</div>
+
+<!-- Event stream + pie chart -->
+<div class="grid2">
+  <div class="card">
+    <h2>Live Event Stream</h2>
+    <div class="filter-row">
+      <select id="sev-filter" onchange="fetchEvents()">
+        <option value="">All Severities</option>
+        <option value="CRITICAL">Critical</option>
+        <option value="WARNING">Warning</option>
+        <option value="INFO">Info</option>
+      </select>
+    </div>
+    <div class="event-stream" id="event-stream">
+      <p style="color:#4b5563">Loading...</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Severity Distribution</h2>
+    <canvas id="pieChart" height="220"></canvas>
+  </div>
+</div>
+
+<!-- Worker risk table -->
+<div class="card">
+  <h2>Worker Risk Profiles</h2>
+  <table>
+    <thead>
+      <tr><th>Worker ID</th><th>Total Events</th><th>Breaches</th><th>Anomalies</th><th>Risk Level</th></tr>
+    </thead>
+    <tbody id="risk-table"><tr><td colspan="5" style="color:#4b5563">Loading...</td></tr></tbody>
+  </table>
+</div>
+
+<div class="btn-row">
+  <button class="btn-train"   onclick="trainModel()">🧠 Train ML Model</button>
+  <button class="btn-refresh" onclick="fetchAll()">↻ Refresh</button>
+  <a href="/dews-dashboard?user_id={{ user.id if user else 1 }}"
+     style="padding:10px 20px;background:#1f2937;color:#e2e8f0;border-radius:8px;text-decoration:none;font-size:0.85rem;">
+    ← Back to DEWS
+  </a>
+</div>
+
+<script>
+const SEV_ICON = { INFO: "🟢", WARNING: "🟠", CRITICAL: "🔴" };
+let pieChart = null;
+
+async function fetchEvents() {
+  const sev = document.getElementById("sev-filter").value;
+  const url = `/api/elis/events?limit=50${sev ? "&severity=" + sev : ""}`;
+  const events = await fetch(url).then(r => r.json());
+  const stream = document.getElementById("event-stream");
+
+  if (!events.length) {
+    stream.innerHTML = '<p style="color:#4b5563;font-size:0.8rem">No events yet. Submit a worker update to generate events.</p>';
+    return;
+  }
+
+  stream.innerHTML = events.map(e => `
+    <div class="event-row">
+      <span class="time">${new Date(e.timestamp).toLocaleTimeString()}</span>
+      <span>${SEV_ICON[e.severity] || "⚪"}</span>
+      <span class="type">${e.event_type}</span>
+      <span class="msg">${e.message}</span>
+      <span>${e.ml_class ? `<span class="ml-badge">${e.ml_class} ${e.ml_confidence ? e.ml_confidence + "%" : ""}</span>` : ""}</span>
+    </div>`).join("");
+}
+
+async function fetchStats() {
+  const s = await fetch("/api/elis/stats").then(r => r.json());
+  document.getElementById("stat-total").textContent    = s.total || 0;
+  document.getElementById("stat-critical").textContent = s.by_severity?.CRITICAL || 0;
+  document.getElementById("stat-warning").textContent  = s.by_severity?.WARNING  || 0;
+  document.getElementById("stat-normal").textContent   = s.by_ml_class?.NORMAL   || 0;
+
+  // Pie chart
+  const labels = Object.keys(s.by_severity || {});
+  const values = Object.values(s.by_severity || {});
+  const colors = labels.map(l => l === "CRITICAL" ? "#ef4444" : l === "WARNING" ? "#f59e0b" : "#22c55e");
+
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(document.getElementById("pieChart"), {
+    type: "pie",
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }] },
+    options: { plugins: { legend: { labels: { color: "#9ca3af" } } } }
+  });
+}
+
+async function fetchRisk() {
+  const risks = await fetch("/api/elis/worker-risk").then(r => r.json());
+  const tbody = document.getElementById("risk-table");
+  if (!risks.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#4b5563">No worker data yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = risks.map(r => `
+    <tr>
+      <td style="font-family:monospace">${r.worker_id}</td>
+      <td>${r.total_events}</td>
+      <td style="color:#ef4444">${r.breaches}</td>
+      <td style="color:#f59e0b">${r.anomalies}</td>
+      <td><span class="badge ${r.risk_level}">${r.risk_level}</span></td>
+    </tr>`).join("");
+}
+
+async function fetchAll() {
+  await Promise.all([fetchEvents(), fetchStats(), fetchRisk()]);
+}
+
+async function trainModel() {
+  const btn = event.target;
+  btn.textContent = "Training...";
+  btn.disabled = true;
+  const result = await fetch("/api/elis/train", { method: "POST" }).then(r => r.json());
+  alert(result.status ? `✅ Trained on ${result.events_used} events` : `❌ ${result.error}`);
+  btn.textContent = "🧠 Train ML Model";
+  btn.disabled = false;
+}
+
+// Load on start, refresh every 5 seconds
+fetchAll();
+setInterval(fetchAll, 5000);
+</script>
+
+</body>
+</html>

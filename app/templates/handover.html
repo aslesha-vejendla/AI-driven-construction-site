@@ -1,0 +1,262 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shift Handover — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+.handover-card {
+  background:var(--surface2); border-radius:10px; padding:16px;
+  border-left:4px solid var(--accent); margin-bottom:12px;
+  position:relative;
+}
+.handover-card.night { border-left-color:#8B5CF6; }
+.shift-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 10px; border-radius:20px;
+  font-family:var(--font-m); font-size:11px; font-weight:600;
+}
+.shift-day   { background:rgba(245,166,35,.15); color:var(--accent); }
+.shift-night { background:rgba(139,92,246,.15); color:#8B5CF6; }
+.ai-brief {
+  background:linear-gradient(135deg,rgba(245,166,35,.05),rgba(59,130,246,.04));
+  border:1px solid rgba(245,166,35,.15);
+  border-radius:8px; padding:12px 14px;
+  font-size:12px; line-height:1.7; color:var(--text2);
+  margin-top:10px;
+}
+.ai-brief::before {
+  content:'🤖 AI Briefing for Incoming Crew';
+  display:block; font-family:var(--font-m); font-size:10px;
+  color:var(--accent); letter-spacing:1px; text-transform:uppercase;
+  margin-bottom:7px;
+}
+.section-divider {
+  font-family:var(--font-m); font-size:10px; color:var(--text3);
+  letter-spacing:2px; text-transform:uppercase;
+  border-bottom:1px solid var(--border); padding-bottom:7px;
+  margin:20px 0 14px;
+}
+</style>
+</head>
+<body>
+<body data-uid="{{ user.id if user else 1 }}"></body>
+<div class="app-layout">
+  {% set role = user.role if user else 'worker' %}
+  {{ sidebar(user, 'handover', role) }}
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">🔄 Shift Handover</div>
+      <div class="topbar-right">
+        <span style="font-size:11px;color:var(--text3);font-family:var(--font-m);">AI-POWERED BRIEFING</span>
+      </div>
+    </div>
+
+    <div class="page">
+      <div class="g2">
+
+        <!-- SUBMIT HANDOVER FORM -->
+        <div>
+          <div class="card">
+            <div class="card-title">📤 Submit End-of-Shift Handover</div>
+            <div class="card-sub">Fill this before leaving site. AI will generate briefing for the next crew.</div>
+
+            <div class="form-group">
+              <label class="form-label">Activity *</label>
+              <select class="form-select" id="hd-activity" required>
+                <option value="">— Select Activity —</option>
+                {% for a in activities %}
+                <option value="{{ a.id }}" data-unit="{{ a.unit }}">{{ a.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="g2">
+              <div class="form-group">
+                <label class="form-label">Your Name *</label>
+                <input class="form-input" id="hd-name" value="{{ user.name if user else '' }}" placeholder="Outgoing crew lead">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Shift *</label>
+                <select class="form-select" id="hd-shift">
+                  <option value="Day">☀️ Day Shift</option>
+                  <option value="Night">🌙 Night Shift</option>
+                  <option value="Morning">🌅 Morning Shift</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="g2">
+              <div class="form-group">
+                <label class="form-label">Quantity Completed *</label>
+                <input class="form-input" type="number" id="hd-qty" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Unit</label>
+                <input class="form-input" id="hd-unit" value="m" placeholder="m">
+              </div>
+            </div>
+
+            <div class="section-divider">Handover Notes</div>
+
+            <div class="form-group">
+              <label class="form-label">Pending / Incomplete Tasks</label>
+              <textarea class="form-textarea" id="hd-pending" placeholder="What's left unfinished? e.g. 20m of segment erection pending, concrete curing ongoing…"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Equipment Status</label>
+              <textarea class="form-textarea" id="hd-equipment" style="min-height:60px;" placeholder="TBM OK. Crane #2 — hydraulic oil topped up. Conveyor belt tension adjusted."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Safety Notes</label>
+              <textarea class="form-textarea" id="hd-safety" style="min-height:60px;" placeholder="Zone C barricaded. Safety harness mandatory beyond CH-340."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Unresolved Issues</label>
+              <textarea class="form-textarea" id="hd-issues" style="min-height:60px;" placeholder="Water seepage at CH-280 — grouting team notified but not yet arrived."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Priority Instructions for Next Crew</label>
+              <textarea class="form-textarea" id="hd-priority" placeholder="Start immediately with segment erection at ring 142. Do NOT advance TBM until geological survey team arrives at 06:00."></textarea>
+            </div>
+
+            <button class="btn btn-primary" onclick="submitHandover()" id="submit-btn" style="width:100%;padding:12px;">
+              ✨ Submit &amp; Generate AI Briefing
+            </button>
+          </div>
+
+          <!-- AI Briefing result -->
+          <div id="briefing-result" style="display:none;margin-top:14px;" class="card">
+            <div class="card-title">🤖 AI Briefing Generated</div>
+            <div class="card-sub">Ready to share with the incoming crew</div>
+            <div id="briefing-text" class="ai-brief"></div>
+            <button class="btn btn-outline btn-sm mt3" onclick="copyBriefing()">📋 Copy Briefing</button>
+          </div>
+        </div>
+
+        <!-- HANDOVER HISTORY -->
+        <div>
+          <div class="card">
+            <div class="card-title">📋 Recent Handovers</div>
+            <div class="card-sub">Latest shift handovers across all activities</div>
+            <div style="margin-bottom:10px;">
+              <select class="form-select" id="hist-activity" onchange="loadHistory()" style="font-size:12px;">
+                <option value="">All Activities</option>
+                {% for a in activities %}
+                <option value="{{ a.id }}">{{ a.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div id="handover-history">
+              <div style="text-align:center;color:var(--text3);padding:24px;">Loading handovers…</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+window.CTWIN_USER_ID = USER_ID;
+
+// Auto-fill unit from activity selection
+document.getElementById('hd-activity').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  if (opt && opt.dataset.unit) document.getElementById('hd-unit').value = opt.dataset.unit;
+});
+
+async function submitHandover() {
+  const btn = document.getElementById('submit-btn');
+  btn.textContent = '⏳ Generating AI Briefing…';
+  btn.disabled = true;
+
+  const payload = {
+    user_id:          USER_ID,
+    activity_id:      parseInt(document.getElementById('hd-activity').value),
+    outgoing_name:    document.getElementById('hd-name').value,
+    shift:            document.getElementById('hd-shift').value,
+    qty_completed:    parseFloat(document.getElementById('hd-qty').value) || 0,
+    unit:             document.getElementById('hd-unit').value,
+    pending_tasks:    document.getElementById('hd-pending').value,
+    equipment_status: document.getElementById('hd-equipment').value,
+    safety_notes:     document.getElementById('hd-safety').value,
+    issues_left:      document.getElementById('hd-issues').value,
+    priority_next:    document.getElementById('hd-priority').value,
+  };
+
+  if (!payload.activity_id || !payload.outgoing_name) {
+    alert('Please fill in Activity and Your Name.');
+    btn.textContent = '✨ Submit & Generate AI Briefing';
+    btn.disabled = false;
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/handover/submit', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    document.getElementById('briefing-result').style.display = 'block';
+    document.getElementById('briefing-text').textContent = data.ai_briefing;
+
+    // Reload history
+    loadHistory();
+
+    btn.textContent = '✅ Submitted!';
+    setTimeout(() => { btn.textContent = '✨ Submit & Generate AI Briefing'; btn.disabled = false; }, 2000);
+  } catch(e) {
+    alert('Submission failed: ' + e.message);
+    btn.textContent = '✨ Submit & Generate AI Briefing';
+    btn.disabled = false;
+  }
+}
+
+async function loadHistory() {
+  const actId = document.getElementById('hist-activity').value;
+  const url = '/api/handovers' + (actId ? `?activity_id=${actId}` : '');
+  const data = await fetch(url).then(r=>r.json());
+  const cont = document.getElementById('handover-history');
+
+  if (!data.length) {
+    cont.innerHTML = '<div style="text-align:center;color:var(--text3);padding:24px;">No handovers submitted yet.</div>';
+    return;
+  }
+
+  cont.innerHTML = data.map(h => `
+    <div class="handover-card ${h.shift==='Night'?'night':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-weight:700;font-size:13px;">${h.outgoing_name}</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span class="shift-badge ${h.shift==='Night'?'shift-night':'shift-day'}">${h.shift==='Night'?'🌙':'☀️'} ${h.shift}</span>
+          <span style="font-family:var(--font-m);font-size:10px;color:var(--text3);">${new Date(h.timestamp).toLocaleDateString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>
+        </div>
+      </div>
+      <div style="font-family:var(--font-m);font-size:11px;color:var(--accent);margin-bottom:8px;">${h.qty_completed}${h.unit} completed this shift</div>
+      ${h.pending_tasks?`<div style="font-size:12px;color:var(--text3);margin-bottom:4px;">⏳ <strong>Pending:</strong> ${h.pending_tasks.substr(0,80)}${h.pending_tasks.length>80?'…':''}</div>`:''}
+      ${h.safety_notes?`<div style="font-size:12px;color:var(--text3);margin-bottom:4px;">⛑️ <strong>Safety:</strong> ${h.safety_notes.substr(0,80)}${h.safety_notes.length>80?'…':''}</div>`:''}
+      ${h.ai_briefing?`<div class="ai-brief" style="margin-top:8px;">${h.ai_briefing}</div>`:''}
+    </div>
+  `).join('');
+}
+
+function copyBriefing() {
+  const text = document.getElementById('briefing-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy Briefing', 1500);
+  });
+}
+
+loadHistory();
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

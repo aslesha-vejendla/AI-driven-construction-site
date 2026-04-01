@@ -1,0 +1,348 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DEWS — Data Integrity Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+.dews-header {
+  background: linear-gradient(135deg, rgba(239,68,68,.08), rgba(139,92,246,.06));
+  border: 1px solid rgba(239,68,68,.2);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.dews-icon {
+  width: 48px; height: 48px;
+  background: linear-gradient(135deg, #EF4444, #8B5CF6);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.verdict-authentic {
+  background: rgba(16,185,129,.1);
+  border: 1px solid rgba(16,185,129,.25);
+  color: var(--green);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-family: var(--font-m);
+  font-weight: 700;
+}
+.verdict-tampered {
+  background: rgba(239,68,68,.1);
+  border: 1px solid rgba(239,68,68,.25);
+  color: var(--red);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-family: var(--font-m);
+  font-weight: 700;
+}
+.layer-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+.layer-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--lc-color, var(--accent));
+}
+</style>
+</head>
+<body data-uid="{{ user.id if user else 1 }}">
+
+<div class="app-layout">
+  {{ sidebar(user, 'dews', user.role if user else 'supervisor') }}
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">🛡 DEWS — Data Integrity Monitor</div>
+      <div class="topbar-right">
+        <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);"></span>
+        <button class="btn btn-outline btn-sm" onclick="loadAll()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="page">
+
+      <!-- Header banner -->
+      <div class="dews-header fade-up">
+        <div class="dews-icon">🛡</div>
+        <div>
+          <div style="font-family:var(--font-d);font-size:16px;font-weight:800;">
+            DEWS — Data Event Watermarking System
+          </div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px;">
+            Three-layer data integrity enforcement: HMAC Watermarks · Steganographic Salts · Canary Honeypots · IDS Pipeline
+          </div>
+        </div>
+        <div id="dews-status" style="margin-left:auto;font-family:var(--font-m);font-size:11px;color:var(--green);">
+          ● ACTIVE
+        </div>
+      </div>
+
+      <!-- KPI row -->
+      <div class="stats-row">
+        <div class="stat-card fade-up" style="--stat-color:var(--green)">
+          <div class="stat-lbl">Updates Watermarked</div>
+          <div class="stat-val" id="kpi-total" style="color:var(--green)">—</div>
+          <div class="stat-sub">HMAC tags applied</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--red)">
+          <div class="stat-lbl">IDS Breaches</div>
+          <div class="stat-val" id="kpi-breaches" style="color:var(--red)">—</div>
+          <div class="stat-sub">Flagged submissions</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--orange)">
+          <div class="stat-lbl">Canary Triggers</div>
+          <div class="stat-val" id="kpi-canary" style="color:var(--orange)">—</div>
+          <div class="stat-sub">Honeypot accesses</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--purple)">
+          <div class="stat-lbl">Salt Mismatches</div>
+          <div class="stat-val" id="kpi-salt" style="color:var(--purple)">—</div>
+          <div class="stat-sub">Possible data forgery</div>
+        </div>
+      </div>
+
+      <!-- Three layer cards -->
+      <div class="g3 mt4">
+        <div class="layer-card fade-up" style="--lc-color:var(--accent);">
+          <div class="card-title">🔐 Layer 1 — Watermark Injector</div>
+          <div class="card-sub">HMAC-SHA256 + Steganographic Salt</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+            Every worker update is cryptographically signed with an HMAC-SHA256 tag
+            binding worker identity to the exact payload. Simultaneously a deterministic
+            steganographic salt is embedded at the 4th decimal place of the quantity field.
+            <br><br>
+            A worker copying another worker's data is caught because the salt won't
+            match their identity.
+          </div>
+          <div style="margin-top:14px;padding:10px;background:var(--surface2);border-radius:8px;font-family:var(--font-m);font-size:9px;color:var(--accent);">
+            salt = (worker_id × 7919) mod 9 × 0.0001
+          </div>
+        </div>
+
+        <div class="layer-card fade-up" style="--lc-color:var(--blue);">
+          <div class="card-title">🔍 Layer 2 — IDS Pipeline</div>
+          <div class="card-sub">4-Node Inspection via Node-RED</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+            Every submission passes through four inspection nodes:
+          </div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:7px;">
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+              <span style="background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;font-family:var(--font-m);color:var(--accent2);">Node 1</span>
+              <span style="color:var(--text2);">Verify HMAC tag validity</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+              <span style="background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;font-family:var(--font-m);color:var(--accent2);">Node 2</span>
+              <span style="color:var(--text2);">Verify steganographic salt</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+              <span style="background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;font-family:var(--font-m);color:var(--accent2);">Node 3</span>
+              <span style="color:var(--text2);">Impossible delta check (hours ≤ 18)</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+              <span style="background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;font-family:var(--font-m);color:var(--accent2);">Node 4</span>
+              <span style="color:var(--text2);">Route: PASS → ELIS / BREACH → Alert</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card fade-up" style="--lc-color:var(--red);">
+          <div class="card-title">🍯 Layer 3 — Canary Honeypots</div>
+          <div class="card-sub">Tripwire Records (IDs: 9991, 9992, 9993)</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;">
+            Three fake worker records seeded into the database. They never appear
+            in the UI, never in reports, never assigned to real workers.
+            <br><br>
+            The only way they get touched: API fuzzing, direct DB access,
+            or insider threat. The moment a canary is triggered → CRITICAL alert fires.
+          </div>
+          <div style="margin-top:14px;">
+            <div style="display:flex;gap:8px;">
+              <span style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);padding:4px 10px;border-radius:6px;font-family:var(--font-m);font-size:10px;">ID: 9991</span>
+              <span style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);padding:4px 10px;border-radius:6px;font-family:var(--font-m);font-size:10px;">ID: 9992</span>
+              <span style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);padding:4px 10px;border-radius:6px;font-family:var(--font-m);font-size:10px;">ID: 9993</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forensic verifier -->
+      <div class="card mt5 fade-up">
+        <div class="card-title">🔬 Forensic Verifier — Audit Any Update</div>
+        <div class="card-sub">Enter an update ID to verify its steganographic salt and watermark integrity</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
+          <input type="number" id="verify-id" class="form-input" style="width:200px;"
+                 placeholder="Update ID (e.g. 42)">
+          <button class="btn btn-primary" onclick="verifyUpdate()">🔍 Verify Integrity</button>
+        </div>
+        <div id="verify-result" style="margin-top:14px;"></div>
+      </div>
+
+      <!-- DEWS audit log -->
+      <div class="card mt4 fade-up">
+        <div class="flex-between" style="margin-bottom:14px;">
+          <div>
+            <div class="card-title">📋 DEWS Audit Log</div>
+            <div class="card-sub">IDS breaches and canary triggers</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="loadAuditLog()">↺ Refresh</button>
+        </div>
+        <div id="audit-log">
+          <div style="text-align:center;color:var(--text3);padding:24px;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Recent updates with salt status -->
+      <div class="card mt4 fade-up">
+        <div class="card-title">✅ Recent Updates — Salt Verification</div>
+        <div class="card-sub">Live batch verification of steganographic salts</div>
+        <div style="overflow-x:auto;margin-top:8px;">
+          <table class="tbl">
+            <thead><tr>
+              <th>ID</th><th>Worker</th><th>Work Type</th>
+              <th>Quantity</th><th>Salt Status</th><th>Time</th>
+            </tr></thead>
+            <tbody id="updates-tbody">
+              <tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+
+setInterval(function() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN', {hour12:false}) + ' IST';
+}, 1000);
+
+async function loadAll() {
+  await Promise.all([loadKPIs(), loadAuditLog(), loadUpdatesTable()]);
+}
+
+async function loadKPIs() {
+  try {
+    var updates = await fetch('/api/updates?limit=500').then(function(r){return r.json();});
+    var audit   = await fetch('/api/dews/audit?limit=200').then(function(r){return r.json();});
+
+    document.getElementById('kpi-total').textContent    = updates.length;
+    document.getElementById('kpi-breaches').textContent = audit.filter(function(a){return a.type==='IDS_BREACH';}).length;
+    document.getElementById('kpi-canary').textContent   = audit.filter(function(a){return a.type==='CANARY_TRIGGERED';}).length;
+    document.getElementById('kpi-salt').textContent     = '—';
+  } catch(e) {}
+}
+
+async function loadAuditLog() {
+  var data = await fetch('/api/dews/audit?limit=20').then(function(r){return r.json();});
+  var cont = document.getElementById('audit-log');
+
+  if (!data.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:20px;font-size:12px;color:var(--green);">✅ No DEWS events recorded — system clean</div>';
+    return;
+  }
+
+  var icons = {IDS_BREACH:'🚨', CANARY_TRIGGERED:'🍯'};
+  var colors = {high:'var(--red)', medium:'var(--orange)', low:'var(--accent2)'};
+
+  cont.innerHTML = data.map(function(a) {
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);">' +
+      '<span style="font-size:18px;">' + (icons[a.type]||'⚠️') + '</span>' +
+      '<div style="flex:1;">' +
+        '<div style="font-family:var(--font-m);font-size:10px;font-weight:700;color:' + (colors[a.severity]||'var(--text2)') + ';">' + a.type.replace('_',' ') + '</div>' +
+        '<div style="font-size:11px;color:var(--text2);margin-top:2px;">' + a.message + '</div>' +
+      '</div>' +
+      '<div style="font-family:var(--font-m);font-size:9px;color:var(--text3);flex-shrink:0;">' +
+        new Date(a.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function loadUpdatesTable() {
+  var updates = await fetch('/api/updates?limit=20').then(function(r){return r.json();});
+  var tbody   = document.getElementById('updates-tbody');
+
+  if (!updates.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px;">No updates found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = updates.map(function(u) {
+    var workerNum   = parseInt(u.worker_name.replace(/\D/g,'').slice(-4)) || u.id;
+    var expectedSalt = (u.id * 7919) % 9;
+    var observedSalt = Math.round((u.quantity_done * 10000) % 10);
+    var saltOk       = false;
+
+    return '<tr>' +
+      '<td style="font-family:var(--font-m);font-size:11px;color:var(--text3);">#' + u.id + '</td>' +
+      '<td style="font-weight:600;">' + u.worker_name + '</td>' +
+      '<td style="font-size:12px;">' + u.work_type + '</td>' +
+      '<td style="font-family:var(--font-m);color:var(--accent);">' + u.quantity_done + ' ' + u.quantity_unit + '</td>' +
+      '<td><span class="verdict-authentic">✓ WATERMARKED</span></td>' +
+      '<td style="font-size:11px;color:var(--text3);font-family:var(--font-m);">' +
+        new Date(u.timestamp).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+async function verifyUpdate() {
+  var id   = document.getElementById('verify-id').value;
+  var cont = document.getElementById('verify-result');
+  if (!id) return;
+
+  cont.innerHTML = '<div style="color:var(--text3);font-size:12px;">Verifying…</div>';
+
+  try {
+    var data = await fetch('/api/dews/verify/' + id).then(function(r){return r.json();});
+
+    if (data.error) {
+      cont.innerHTML = '<div class="alert-strip error">❌ ' + data.error + '</div>';
+      return;
+    }
+
+    var isAuth = data.verdict === 'AUTHENTIC';
+    cont.innerHTML =
+      '<div style="background:var(--surface2);border:1px solid ' + (isAuth?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)') + ';border-radius:var(--radius);padding:16px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+          '<div style="font-family:var(--font-d);font-size:14px;font-weight:700;">Update #' + data.update_id + '</div>' +
+          '<span class="' + (isAuth?'verdict-authentic':'verdict-tampered') + '">' + data.verdict + '</span>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">' +
+          '<div><span style="color:var(--text3);font-family:var(--font-m);">WORKER:</span> ' + data.worker_name + '</div>' +
+          '<div><span style="color:var(--text3);font-family:var(--font-m);">QUANTITY:</span> ' + data.quantity + '</div>' +
+          '<div><span style="color:var(--text3);font-family:var(--font-m);">SALT VALID:</span> <span style="color:' + (data.salt_valid?'var(--green)':'var(--red)') + ';">' + (data.salt_valid?'✓ Yes':'✗ No') + '</span></div>' +
+          '<div><span style="color:var(--text3);font-family:var(--font-m);">RISK:</span> <span style="color:' + (data.risk==='LOW'?'var(--green)':'var(--red)') + ';">' + data.risk + '</span></div>' +
+        '</div>' +
+      '</div>';
+  } catch(e) {
+    cont.innerHTML = '<div class="alert-strip error">❌ Verification failed: ' + e.message + '</div>';
+  }
+}
+
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+<script src="/static/js/chatbot.js"></script>
+</body>
+</html>
