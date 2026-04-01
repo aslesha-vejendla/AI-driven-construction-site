@@ -1,0 +1,279 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gantt Chart — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+.gantt-wrap { overflow-x: auto; padding-bottom: 10px; }
+.gantt-table { min-width: 900px; border-collapse: collapse; width: 100%; }
+.gantt-table th {
+  font-family: var(--font-m); font-size: 9px; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text3);
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+  white-space: nowrap; text-align: left;
+}
+.gantt-table td { padding: 6px 0; vertical-align: middle; }
+.gantt-row { border-bottom: 1px solid rgba(255,255,255,.025); }
+.gantt-row:hover td { background: rgba(255,255,255,.02); }
+.act-name-cell { padding: 0 14px; min-width: 200px; max-width: 200px; }
+.act-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.act-type  { font-family: var(--font-m); font-size: 9px; color: var(--text3); margin-top: 2px; }
+.timeline-cell { position: relative; }
+.bar-track { height: 28px; position: relative; }
+.bar-planned {
+  position: absolute; height: 10px; top: 4px;
+  background: rgba(255,255,255,.07); border-radius: 5px;
+}
+.bar-actual  {
+  position: absolute; height: 10px; top: 14px;
+  border-radius: 5px; transition: width 1s ease;
+}
+.bar-forecast {
+  position: absolute; height: 10px; top: 14px;
+  border-radius: 5px; opacity: .45;
+  border: 1px dashed; background: transparent;
+}
+.today-line {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: var(--accent); opacity: .7; pointer-events: none;
+  z-index: 5;
+}
+.today-line::before {
+  content: 'TODAY';
+  position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-m); font-size: 9px; color: var(--accent);
+  white-space: nowrap;
+}
+.month-header { display: flex; min-width: 900px; }
+.month-label {
+  font-family: var(--font-m); font-size: 10px; color: var(--text3);
+  text-align: center; border-right: 1px solid var(--border);
+  padding: 5px 0;
+}
+.pct-cell { min-width: 60px; padding: 0 12px; font-family: var(--font-m); font-size: 11px; text-align: right; }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-family: var(--font-m); font-size: 11px; color: var(--text3); margin-bottom: 14px; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-swatch { width: 28px; height: 8px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<body data-uid="{{ user.id if user else 1 }}"></body>
+<div class="app-layout">
+  {{ sidebar(user, 'gantt', user.role if user else 'supervisor') }}
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">📅 Gantt Chart — Project Timeline</div>
+      <div class="topbar-right">
+        <select id="project-filter" class="form-select" style="width:auto;font-size:12px;padding:7px 12px;" onchange="renderGantt()">
+          <option value="all">All Projects</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="renderGantt()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="page">
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,.1);"></div>Planned Duration</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--green);"></div>Actual Progress (On Track)</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--orange);"></div>Actual Progress (Medium Risk)</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--red);"></div>Actual Progress (High Risk)</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:transparent;border:1px dashed #8B5CF6;"></div>AI Forecast</div>
+        <div class="legend-item"><div style="width:2px;height:14px;background:var(--accent);"></div>Today</div>
+      </div>
+
+      <!-- Month labels -->
+      <div id="month-labels" style="margin-left:200px;margin-bottom:0;"></div>
+
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="gantt-wrap">
+          <div id="gantt-body">
+            <div style="text-align:center;color:var(--text3);padding:40px;">Loading Gantt chart…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity details -->
+      <div class="card mt5" id="detail-card" style="display:none;">
+        <div class="card-title" id="detail-name">Activity Detail</div>
+        <div id="detail-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+window.CTWIN_USER_ID = USER_ID;
+
+let allActivities = [];
+let allForecasts  = [];
+let allTwin       = [];
+let allProjects   = [];
+
+async function renderGantt() {
+  const [projects, activities, forecasts, twin] = await Promise.all([
+    fetch('/api/projects').then(r=>r.json()),
+    fetch('/api/activities').then(r=>r.json()),
+    fetch('/api/delay-forecast').then(r=>r.json()),
+    fetch('/digital-twin').then(r=>r.json()),
+  ]);
+
+  allProjects   = projects;
+  allActivities = activities;
+  allForecasts  = forecasts;
+  allTwin       = twin;
+
+  // Populate project filter
+  const sel = document.getElementById('project-filter');
+  const existing = [...sel.options].map(o=>o.value);
+  projects.forEach(p => {
+    if (!existing.includes(String(p.id))) {
+      const opt = document.createElement('option');
+      opt.value = p.id; opt.textContent = p.name;
+      sel.appendChild(opt);
+    }
+  });
+
+  const filterVal = sel.value;
+
+  // Determine timeline bounds
+  const today    = new Date();
+  const startAll = new Date(today); startAll.setMonth(startAll.getMonth() - 3);
+  const endAll   = new Date(today); endAll.setMonth(endAll.getMonth() + 9);
+  const totalMs  = endAll - startAll;
+
+  // Month labels
+  const months = [];
+  let cur = new Date(startAll.getFullYear(), startAll.getMonth(), 1);
+  while (cur <= endAll) {
+    months.push(new Date(cur));
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  const monthLabels = document.getElementById('month-labels');
+  monthLabels.style.display = 'flex';
+  monthLabels.innerHTML = months.map(m => {
+    const pct = (new Date(m.getFullYear(), m.getMonth()+1, 1) - startAll) / totalMs * 100
+              - (m - startAll) / totalMs * 100;
+    return `<div class="month-label" style="flex:${Math.max(pct,4)}%;">
+      ${m.toLocaleString('en-IN',{month:'short'})} '${String(m.getFullYear()).substr(2)}
+    </div>`;
+  }).join('');
+
+  // Today line position
+  const todayPct = (today - startAll) / totalMs * 100;
+
+  // Build rows
+  const filtered = activities.filter(a =>
+    filterVal === 'all' || String(a.project_id) === filterVal
+  );
+
+  const fcMap   = Object.fromEntries(forecasts.map(f => [f.activity_id, f]));
+  const twinMap = Object.fromEntries(twin.map(t => [t.activity_id, t]));
+
+  let html = `<table class="gantt-table">
+    <thead><tr>
+      <th style="min-width:200px;">Activity</th>
+      <th style="width:100%;">Timeline (${startAll.toLocaleDateString('en-IN',{month:'short',year:'2-digit'})} → ${endAll.toLocaleDateString('en-IN',{month:'short',year:'2-digit'})})</th>
+      <th>Progress</th>
+      <th>Status</th>
+    </tr></thead><tbody>`;
+
+  filtered.forEach(a => {
+    const fc = fcMap[a.id] || {};
+    const tw = twinMap[a.id] || {};
+
+    // Planned bar (use activity start + duration or fallback)
+    const planStart = a.start_date ? new Date(a.start_date) : new Date(startAll);
+    const planEnd   = new Date(planStart);
+    planEnd.setDate(planEnd.getDate() + (a.planned_duration_days || 90));
+
+    const ps  = Math.max(0, Math.min(100, (planStart - startAll) / totalMs * 100));
+    const pe  = Math.max(0, Math.min(100, (planEnd   - startAll) / totalMs * 100));
+    const pw  = pe - ps;
+
+    // Actual bar: proportional to progress
+    const pct    = tw.progress_pct || 0;
+    const acW    = pw * (pct / 100);
+    const color  = tw.color || 'var(--green)';
+
+    // Forecast bar: from progress point to ETA
+    let fcHtml = '';
+    if (fc.eta && fc.progress_pct < 100) {
+      const etaDate  = new Date(fc.eta);
+      const fcStart  = ps + acW;
+      const fcEnd    = Math.min(100, (etaDate - startAll) / totalMs * 100);
+      const fcW      = Math.max(0, fcEnd - fcStart);
+      const fcColor  = fc.on_time ? '#8B5CF6' : '#EF4444';
+      fcHtml = `<div class="bar-forecast" style="left:${fcStart}%;width:${fcW}%;border-color:${fcColor};"></div>`;
+    }
+
+    const statusBc = tw.status==='ON TRACK'?'badge-green':tw.status==='MEDIUM RISK'?'badge-yellow':tw.status==='HIGH RISK'?'badge-red':'badge-gray';
+
+    html += `<tr class="gantt-row" onclick="showDetail(${a.id})" style="cursor:pointer;">
+      <td class="act-name-cell">
+        <div class="act-name" title="${a.name}">${a.name}</div>
+        <div class="act-type">${a.type}</div>
+      </td>
+      <td class="timeline-cell" style="position:relative;">
+        <div class="bar-track" style="margin:0 6px;position:relative;">
+          <div class="today-line" style="left:${todayPct}%;"></div>
+          <div class="bar-planned" style="left:${ps}%;width:${pw}%;"></div>
+          <div class="bar-actual"  style="left:${ps}%;width:${acW}%;background:${color};"></div>
+          ${fcHtml}
+        </div>
+      </td>
+      <td class="pct-cell" style="color:${color};">${pct}%</td>
+      <td style="padding:0 10px;white-space:nowrap;">
+        <span class="badge ${statusBc}" style="font-size:10px;">${tw.status||'NO DATA'}</span>
+      </td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('gantt-body').innerHTML = html;
+}
+
+async function showDetail(actId) {
+  const card = document.getElementById('detail-card');
+  card.style.display = 'block';
+  card.scrollIntoView({behavior:'smooth', block:'start'});
+
+  const fc = allForecasts.find(f=>f.activity_id===actId) || {};
+  const tw = allTwin.find(t=>t.activity_id===actId) || {};
+  const a  = allActivities.find(x=>x.id===actId) || {};
+
+  document.getElementById('detail-name').textContent = a.name || 'Activity Detail';
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="stats-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-top:12px;">
+      <div class="stat-card"><div class="stat-lbl">Progress</div><div class="stat-val" style="color:${tw.color||'var(--accent)'};">${tw.progress_pct||0}%</div></div>
+      <div class="stat-card" style="--stat-color:var(--accent2)"><div class="stat-lbl">ETA</div><div class="stat-val" style="font-size:18px;">${fc.eta||'—'}</div></div>
+      <div class="stat-card" style="--stat-color:${fc.on_time?'var(--green)':'var(--red)'}"><div class="stat-lbl">Delay</div><div class="stat-val" style="font-size:18px;color:${fc.on_time?'var(--green)':'var(--red)'};">${fc.delay_days>0?'+'+fc.delay_days+'d':'On Time'}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Adv/Day</div><div class="stat-val" style="font-size:20px;">${fc.advance_per_day||0}${a.unit||''}</div></div>
+      <div class="stat-card" style="--stat-color:var(--red)"><div class="stat-lbl">Risk Score</div><div class="stat-val" style="color:${tw.color||'var(--text)'};">${tw.risk_score||0}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Confidence</div><div class="stat-val" style="font-size:18px;">${fc.confidence||0}%</div></div>
+    </div>
+    ${fc.forecast_7d && fc.forecast_7d.length ? `
+    <div style="margin-top:14px;">
+      <div style="font-family:var(--font-m);font-size:10px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">7-Day AI Forecast</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;">
+        ${fc.forecast_7d.map(f=>`
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 11px;text-align:center;min-width:80px;">
+            <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);">${new Date(f.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</div>
+            <div style="font-family:var(--font-d);font-size:16px;font-weight:700;color:var(--accent);margin-top:3px;">${f.projected_cumulative}</div>
+            <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);">${a.unit||''}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : ''}
+  `;
+}
+
+renderGantt();
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

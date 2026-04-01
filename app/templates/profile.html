@@ -1,0 +1,196 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profile — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-uid="{{ user.id if user else 1 }}"
+      data-uname="{{ user.name if user else 'User' }}"
+      data-role="{{ user.role if user else 'worker' }}">
+
+<div class="app-layout">
+  {{ sidebar(user, 'profile', user.role if user else 'worker') }}
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">👤 My Profile</div>
+      <div class="topbar-right">
+        <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);"></span>
+      </div>
+    </div>
+
+    <div class="page">
+
+      {% if request.query_params.get('saved') %}
+      <div class="alert-strip success">✅ Profile updated successfully!</div>
+      {% endif %}
+
+      <div class="g2">
+
+        <!-- Profile card -->
+        <div class="card fade-up">
+          <div class="card-title">👤 Account Details</div>
+          <div class="card-sub">Your personal information</div>
+
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px;">
+            <div class="avatar" style="
+              width:56px;height:56px;font-size:22px;border-radius:14px;
+              background:{{ user.avatar_color if user else '#F5A623' }};">
+              {{ user.name[0].upper() if user else '?' }}
+            </div>
+            <div>
+              <div style="font-family:var(--font-d);font-size:18px;font-weight:800;">{{ user.name if user else '—' }}</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:3px;">{{ user.email if user else '—' }}</div>
+              <span class="badge {% if user and user.role == 'supervisor' %}badge-amber{% else %}badge-blue{% endif %}" style="margin-top:6px;">
+                {{ user.role.upper() if user else 'WORKER' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Edit form -->
+          <form method="POST" action="/profile/update">
+            <input type="hidden" name="user_id" value="{{ user.id if user else 1 }}">
+            <div class="form-group">
+              <label class="form-label">Full Name</label>
+              <input class="form-input" type="text" name="name" value="{{ user.name if user else '' }}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Designation</label>
+              <input class="form-input" type="text" name="designation" value="{{ user.designation if user else '' }}" placeholder="e.g. Site Engineer">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Company</label>
+              <input class="form-input" type="text" name="company" value="{{ user.company if user else '' }}" placeholder="e.g. L&T Construction">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input class="form-input" type="text" name="phone" value="{{ user.phone if user else '' }}" placeholder="+91 XXXXX XXXXX">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;margin-top:4px;">💾 Save Changes</button>
+          </form>
+        </div>
+
+        <!-- Stats card -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+
+          <div class="card fade-up">
+            <div class="card-title">📊 My Stats</div>
+            <div class="card-sub">Lifetime contribution summary</div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+                <div style="font-family:var(--font-d);font-size:28px;font-weight:800;color:var(--accent);">{{ update_count }}</div>
+                <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Updates</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+                <div style="font-family:var(--font-d);font-size:28px;font-weight:800;color:var(--green);">{{ total_qty }}</div>
+                <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Total Qty</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+                <div style="font-family:var(--font-d);font-size:28px;font-weight:800;color:var(--accent2);">{{ total_hrs }}</div>
+                <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Hours</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+                <div style="font-family:var(--font-d);font-size:28px;font-weight:800;color:var(--purple);" id="eff-val">—</div>
+                <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Qty/Hr</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card fade-up">
+            <div class="card-title">🔐 Account Info</div>
+            <div class="card-sub">Read-only system details</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
+                <span style="font-size:12px;color:var(--text3);font-family:var(--font-m);">USER ID</span>
+                <span style="font-family:var(--font-m);font-size:12px;color:var(--accent);">#{{ user.id if user else '—' }}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
+                <span style="font-size:12px;color:var(--text3);font-family:var(--font-m);">EMAIL</span>
+                <span style="font-size:12px;">{{ user.email if user else '—' }}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
+                <span style="font-size:12px;color:var(--text3);font-family:var(--font-m);">ROLE</span>
+                <span class="badge {% if user and user.role == 'supervisor' %}badge-amber{% else %}badge-blue{% endif %}">{{ user.role.upper() if user else '—' }}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:9px 0;">
+                <span style="font-size:12px;color:var(--text3);font-family:var(--font-m);">DESIGNATION</span>
+                <span style="font-size:12px;">{{ user.designation if user and user.designation else 'Not set' }}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Recent updates table -->
+      {% if updates %}
+      <div class="card mt5 fade-up">
+        <div class="card-title">📋 My Recent Submissions</div>
+        <div class="card-sub">Last {{ updates|length }} field updates</div>
+        <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr>
+              <th>Activity</th><th>Work Type</th><th>Qty</th>
+              <th>Hours</th><th>Issue</th><th>Date</th>
+            </tr></thead>
+            <tbody>
+              {% for u in updates[:15] %}
+              <tr>
+                <td style="font-family:var(--font-m);font-size:11px;color:var(--text3);">#{{ u.activity_id }}</td>
+                <td style="font-size:13px;font-weight:600;">{{ u.work_type }}</td>
+                <td style="font-family:var(--font-m);color:var(--accent);">{{ u.quantity_done }}{{ u.quantity_unit }}</td>
+                <td style="font-family:var(--font-m);">{{ u.hours_worked }}h</td>
+                <td>
+                  {% if u.issue_type and u.issue_type.lower() != 'none' %}
+                    <span class="badge badge-red">⚠ {{ u.issue_type[:18] }}</span>
+                  {% else %}
+                    <span class="badge badge-green">✓ Clear</span>
+                  {% endif %}
+                </td>
+                <td style="font-size:11px;color:var(--text3);font-family:var(--font-m);">
+                  {{ u.timestamp.strftime('%d %b %Y') }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="card mt5 fade-up" style="text-align:center;padding:32px;">
+        <div style="font-size:32px;margin-bottom:12px;">📋</div>
+        <div style="font-family:var(--font-d);font-size:15px;font-weight:700;">No updates yet</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px;">Submit your first field update to see history here</div>
+        <a id="submit-link" href="#" class="btn btn-primary" style="margin-top:16px;">+ Submit Update</a>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+var TOTAL_QTY = {{ total_qty }};
+var TOTAL_HRS = {{ total_hrs }};
+
+
+if (document.getElementById('submit-link'))
+  document.getElementById('submit-link').href = '/update-work?user_id=' + USER_ID;
+
+var eff = TOTAL_HRS > 0 ? (TOTAL_QTY / TOTAL_HRS).toFixed(1) : '0';
+var effEl = document.getElementById('eff-val');
+if (effEl) effEl.textContent = eff;
+
+setInterval(function() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN', {hour12:false}) + ' IST';
+}, 1000);
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

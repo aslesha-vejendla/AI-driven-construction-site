@@ -1,0 +1,324 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Worker Dashboard — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* ── Page-specific enhancements ──────────────────────────── */
+.welcome-banner {
+  background: linear-gradient(135deg,
+    rgba(245,166,35,.08) 0%,
+    rgba(59,130,246,.05) 50%,
+    transparent 100%);
+  border: 1px solid rgba(245,166,35,.15);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.welcome-text { font-family:var(--font-d); font-size:20px; font-weight:800; }
+.welcome-sub  { font-size:12px; color:var(--text3); margin-top:3px; font-family:var(--font-m); }
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.qa-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  text-align: center;
+  text-decoration: none;
+  color: var(--text);
+  transition: all .2s;
+  cursor: pointer;
+}
+.qa-card:hover {
+  border-color: var(--accent);
+  background: rgba(245,166,35,.04);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.3);
+}
+.qa-icon { font-size: 28px; margin-bottom: 8px; display:block; }
+.qa-label { font-family:var(--font-d); font-size:13px; font-weight:700; }
+.qa-desc  { font-size:10px; color:var(--text3); margin-top:3px; font-family:var(--font-m); }
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body data-uid="{{ user.id if user else 1 }}"
+      data-uname="{{ user.name if user else 'Worker' }}">
+
+<div class="app-layout">
+  {{ sidebar(user, 'dash', 'worker') }}
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">
+        <span style="color:var(--accent);">👷</span> Worker Dashboard
+      </div>
+      <div class="topbar-right">
+        <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);letter-spacing:.5px;"></span>
+        <a href="/smart-update" id="smart-link" class="btn btn-primary btn-sm">✦ AI Update</a>
+        <a href="/update-work"  id="manual-link" class="btn btn-outline btn-sm">+ Manual</a>
+      </div>
+    </div>
+
+    <div class="page">
+
+      <!-- Welcome banner -->
+      <div class="welcome-banner fade-up">
+        <div>
+          <div class="welcome-text">Good work, <span id="wname" style="color:var(--accent);">—</span> 👷</div>
+          <div class="welcome-sub" id="wdate">Loading…</div>
+        </div>
+        <div style="font-family:var(--font-m);font-size:11px;color:var(--text3);text-align:right;">
+          <div id="shift-indicator" style="padding:5px 12px;background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.2);border-radius:20px;color:var(--accent);">☀️ Day Shift</div>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-card fade-up">
+          <div class="stat-lbl">Activities</div>
+          <div class="stat-val">{{ activities|length }}</div>
+          <div class="stat-sub">On this project</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--accent2)">
+          <div class="stat-lbl">My Updates</div>
+          <div class="stat-val" id="my-count">—</div>
+          <div class="stat-sub">Total submissions</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--green)">
+          <div class="stat-lbl">Hours Logged</div>
+          <div class="stat-val" id="my-hours">—</div>
+          <div class="stat-sub">This project</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--orange)">
+          <div class="stat-lbl">Qty Done</div>
+          <div class="stat-val" id="my-qty">—</div>
+          <div class="stat-sub">Total quantity</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--red)">
+          <div class="stat-lbl">Issues Filed</div>
+          <div class="stat-val" id="my-issues">—</div>
+          <div class="stat-sub">Reported problems</div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="quick-actions fade-up">
+        <a class="qa-card" id="qa-smart" href="#">
+          <span class="qa-icon">✦</span>
+          <div class="qa-label">Smart Update</div>
+          <div class="qa-desc">Describe work in plain English — AI extracts fields</div>
+        </a>
+        <a class="qa-card" id="qa-manual" href="#">
+          <span class="qa-icon">📝</span>
+          <div class="qa-label">Manual Update</div>
+          <div class="qa-desc">Traditional form — fill each field yourself</div>
+        </a>
+        <a class="qa-card" id="qa-handover" href="#">
+          <span class="qa-icon">🔄</span>
+          <div class="qa-label">Shift Handover</div>
+          <div class="qa-desc">End-of-shift briefing with AI summary</div>
+        </a>
+      </div>
+
+      <div class="g2">
+        <!-- Activity progress -->
+        <div class="card fade-up">
+          <div class="card-title">📊 Activity Progress</div>
+          <div class="card-sub">Planned vs completed quantities</div>
+          <div id="progress-list">
+            <div style="text-align:center;color:var(--text3);padding:24px;">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Risk overview -->
+        <div class="card fade-up">
+          <div class="card-title">🔴 Site Risk Overview</div>
+          <div class="card-sub">Current digital twin risk scores</div>
+          <canvas id="riskChart" style="max-height:220px;"></canvas>
+        </div>
+      </div>
+
+      <!-- Recent updates -->
+      <div class="card mt5 fade-up">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div>
+            <div class="card-title">📋 Recent Field Updates</div>
+            <div class="card-sub">Latest submissions from all workers</div>
+          </div>
+          <a id="submit-link" href="#" class="btn btn-primary btn-sm">+ New Update</a>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr>
+              <th>Activity</th><th>Work Type</th><th>Qty</th>
+              <th>Hours</th><th>Weather</th><th>Issue</th><th>Time</th>
+            </tr></thead>
+            <tbody id="updates-tbody">
+              <tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID   = parseInt(document.body.dataset.uid   || '1', 10);
+var USER_NAME = document.body.dataset.uname || 'Worker';
+window.CTWIN_USER_ID = USER_ID;
+
+/* Fix links with user_id */
+document.getElementById('smart-link').href    = '/smart-update?user_id='  + USER_ID;
+document.getElementById('manual-link').href   = '/update-work?user_id='   + USER_ID;
+document.getElementById('qa-smart').href      = '/smart-update?user_id='  + USER_ID;
+document.getElementById('qa-manual').href     = '/update-work?user_id='   + USER_ID;
+document.getElementById('qa-handover').href   = '/handover?user_id='      + USER_ID;
+document.getElementById('submit-link').href   = '/update-work?user_id='   + USER_ID;
+
+/* Welcome */
+document.getElementById('wname').textContent = USER_NAME.split(' ')[0];
+var now = new Date();
+document.getElementById('wdate').textContent =
+  now.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+var hr = now.getHours();
+document.getElementById('shift-indicator').textContent =
+  hr >= 6 && hr < 14 ? '🌅 Morning Shift' :
+  hr >= 14 && hr < 22 ? '☀️ Day Shift' : '🌙 Night Shift';
+
+/* Clock */
+setInterval(function() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN',{hour12:false}) + ' IST';
+}, 1000);
+
+/* Stats */
+async function loadStats() {
+  try {
+    var updates = await fetch('/api/updates?limit=500').then(function(r){ return r.json(); });
+    var mine    = updates.filter(function(u){ return u.worker_name === USER_NAME; });
+    document.getElementById('my-count').textContent  = mine.length;
+    document.getElementById('my-hours').textContent  = mine.reduce(function(s,u){ return s+u.hours_worked; }, 0).toFixed(0);
+    document.getElementById('my-qty').textContent    = mine.reduce(function(s,u){ return s+u.quantity_done; }, 0).toFixed(1);
+    document.getElementById('my-issues').textContent = mine.filter(function(u){ return u.issue_type && u.issue_type.toLowerCase() !== 'none'; }).length;
+  } catch(e) {}
+}
+
+/* Progress bars */
+async function loadProgress() {
+  var data = await fetch('/api/progress-summary').then(function(r){ return r.json(); });
+  var list = document.getElementById('progress-list');
+  if (!data.length) {
+    list.innerHTML = '<p style="color:var(--text3);padding:16px;font-size:13px;">No activities yet. Seed the database first.</p>';
+    return;
+  }
+  list.innerHTML = data.map(function(d) {
+    var pct = Math.min(d.progress_pct, 100);
+    var col = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
+    return '<div class="activity-item">' +
+      '<div class="activity-dot" style="background:' + col + ';box-shadow:0 0 6px ' + col + ';"></div>' +
+      '<div style="flex:1;">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">' +
+          '<span style="font-size:13px;font-weight:600;">' + d.activity_name + '</span>' +
+          '<span style="font-family:var(--font-m);font-size:11px;color:' + col + ';">' + d.progress_pct + '%</span>' +
+        '</div>' +
+        '<div class="pbar"><div class="pbar-fill" style="width:' + pct + '%;background:' + col + ';"></div></div>' +
+        '<div style="font-family:var(--font-m);font-size:10px;color:var(--text3);margin-top:4px;">' +
+          d.completed_quantity + ' ' + d.unit + ' of ' + d.planned_quantity + ' ' + d.unit + ' planned' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+/* Risk chart */
+async function loadRiskChart() {
+  var data = await fetch('/digital-twin').then(function(r){ return r.json(); });
+  if (!data.length) return;
+  new Chart(document.getElementById('riskChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: data.map(function(d){ return d.activity.length > 16 ? d.activity.substr(0,14)+'…' : d.activity; }),
+      datasets: [{
+        data: data.map(function(d){ return d.risk_score; }),
+        backgroundColor: data.map(function(d){ return d.color + '55'; }),
+        borderColor:     data.map(function(d){ return d.color; }),
+        borderWidth: 2, borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive:true,
+      plugins: { legend:{ display:false } },
+      scales: {
+        x: { ticks:{color:'#71717A',font:{size:10}}, grid:{color:'rgba(255,255,255,.03)'} },
+        y: { min:0, max:100, ticks:{color:'#71717A'}, grid:{color:'rgba(255,255,255,.03)'} }
+      }
+    }
+  });
+}
+
+/* Updates table */
+async function loadUpdates() {
+  var updates = await fetch('/api/updates?limit=20').then(function(r){ return r.json(); });
+  var tbody   = document.getElementById('updates-tbody');
+  if (!updates.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px;">No updates yet. Submit your first update!</td></tr>';
+    return;
+  }
+  tbody.innerHTML = updates.map(function(u) {
+    var hasIssue = u.issue_type && u.issue_type.toLowerCase() !== 'none';
+    var wx = {'Clear':'☀️','Cloudy':'☁️','Rain':'🌧️','Heavy Rain':'⛈️','Fog':'🌫️','Extreme Heat':'🔥'};
+    return '<tr>' +
+      '<td style="font-family:var(--font-m);font-size:11px;color:var(--text3);">#' + u.activity_id + '</td>' +
+      '<td style="font-size:12px;font-weight:600;">' + u.work_type + '</td>' +
+      '<td style="font-family:var(--font-m);font-size:12px;color:var(--accent);">' + u.quantity_done + u.quantity_unit + '</td>' +
+      '<td style="font-family:var(--font-m);font-size:12px;">' + u.hours_worked + 'h</td>' +
+      '<td style="font-size:12px;">' + (wx[u.weather_condition] || '🌡️') + ' ' + u.weather_condition + '</td>' +
+      '<td>' + (hasIssue ?
+        '<span class="badge badge-red">⚠ ' + u.issue_type.substr(0,16) + '</span>' :
+        '<span class="badge badge-green">✓ Clear</span>') +
+      '</td>' +
+      '<td style="font-size:11px;color:var(--text3);font-family:var(--font-m);">' +
+        new Date(u.timestamp).toLocaleDateString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+loadStats();
+loadProgress();
+loadRiskChart();
+loadUpdates();
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

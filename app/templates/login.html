@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🏗️ ConstructionEase</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            background: linear-gradient(135deg, #2F5D62, #F9A826);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            background: #ffffff;
+            width: 360px;
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+        h2 {
+            text-align: center;
+            color: #2F5D62;
+            margin-bottom: 5px;
+        }
+        p {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #2F5D62;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .link {
+            text-align: center;
+            margin-top: 12px;
+        }
+        a {
+            color: #F9A826;
+            font-weight: bold;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+<div class="card">
+    <h2>🏗️ Site Login</h2>
+    <p>Monitor your construction with us</p>
+
+    <!-- FIELD NAMES FIXED -->
+    <form action="/login" method="post">
+        <input name="email" type="email" placeholder="Email" required>
+        <input name="password" type="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+
+    <div class="link">
+        New here? <a href="/register">Register 👷</a>
+    </div>
+</div>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

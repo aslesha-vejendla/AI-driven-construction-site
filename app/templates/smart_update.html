@@ -1,0 +1,358 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart Update — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+.nlp-input-box {
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  transition: border-color .2s;
+  position: relative;
+}
+.nlp-input-box:focus-within { border-color: var(--accent); }
+.nlp-textarea {
+  width: 100%; background: transparent; border: none;
+  outline: none; color: var(--text); font-size: 15px;
+  font-family: var(--font-b); line-height: 1.6;
+  resize: none; min-height: 100px;
+}
+.nlp-textarea::placeholder { color: var(--text3); }
+.parse-btn {
+  position: absolute; bottom: 14px; right: 14px;
+  background: var(--accent); border: none; border-radius: 8px;
+  padding: 8px 18px; font-family: var(--font-d); font-weight: 700;
+  font-size: 13px; cursor: pointer; color: #000;
+  transition: all .15s; display: flex; align-items: center; gap: 6px;
+}
+.parse-btn:hover { background: #e09520; transform: translateY(-1px); }
+.parse-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+.parsed-field {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px;
+  background: var(--surface2); border-radius: 9px;
+  border: 1px solid var(--border); margin-bottom: 9px;
+  transition: border-color .2s;
+}
+.parsed-field:focus-within { border-color: rgba(245,166,35,.4); }
+.field-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
+.field-label { font-family: var(--font-m); font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; min-width: 90px; }
+.field-val {
+  flex: 1; background: transparent; border: none;
+  outline: none; color: var(--text); font-size: 13px;
+  font-family: var(--font-b);
+}
+.field-val select { background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; width: 100%; }
+.conf-bar { height: 3px; border-radius: 3px; background: var(--border); margin-top: 8px; overflow: hidden; }
+.conf-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+
+.example-prompts { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+.ep {
+  padding: 6px 13px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 20px;
+  font-size: 12px; color: var(--text3); cursor: pointer;
+  transition: all .15s; font-family: var(--font-m);
+}
+.ep:hover { border-color: var(--accent); color: var(--accent); }
+
+.status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.ai-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 20px;
+  background: rgba(139,92,246,.15); color: #8B5CF6;
+  font-family: var(--font-m); font-size: 10px; font-weight: 700;
+}
+</style>
+</head>
+<body>
+<body data-uid="{{ user.id if user else 1 }}"></body>
+<div class="app-layout">
+  {{ sidebar(user, 'smart', 'worker') }}
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">✨ Smart Update</div>
+      <div class="topbar-right">
+        <span class="ai-tag">✦ AI-POWERED</span>
+      </div>
+    </div>
+    <div class="page">
+      <div style="max-width:700px; margin:0 auto;">
+
+        <!-- Explainer -->
+        <div class="card" style="border-color:rgba(139,92,246,.3);margin-bottom:20px;background:linear-gradient(135deg,rgba(139,92,246,.06),rgba(245,166,35,.04));">
+          <div style="display:flex;gap:14px;align-items:flex-start;">
+            <span style="font-size:32px;">✨</span>
+            <div>
+              <div style="font-family:var(--font-d);font-size:16px;font-weight:800;margin-bottom:5px;">Just describe your work in plain English</div>
+              <div style="font-size:13px;color:var(--text2);line-height:1.65;">
+                No more filling forms field by field. Type what you did naturally —
+                SiteAI will extract quantity, hours, issues, and weather automatically.
+                Review the parsed fields, make any corrections, and submit in one click.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Example prompts -->
+        <div style="margin-bottom:10px;font-family:var(--font-m);font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;">Try an example</div>
+        <div class="example-prompts">
+          <span class="ep" onclick="fillExample(this)">Today TBM advanced 3.8m in 12 hours, crew of 18, minor equipment issue with conveyor belt</span>
+          <span class="ep" onclick="fillExample(this)">Poured 120 m3 of concrete for spillway section, 9 hours, rainy weather, crew 24, all clear</span>
+          <span class="ep" onclick="fillExample(this)">Segment erection done — 6 rings today, 10 hours work, no issues, clear weather, 15 workers</span>
+          <span class="ep" onclick="fillExample(this)">Highway paving layer 1: 800 sq meters completed, 8 hours, material delay held us up for 2 hrs</span>
+        </div>
+
+        <!-- NLP input -->
+        <div class="nlp-input-box">
+          <textarea class="nlp-textarea" id="nlp-text"
+            placeholder="e.g. Today we advanced 4.2 metres with the TBM in 11 hours. Crew of 20. Equipment issue with grout pump in the afternoon — lost 2 hours. Weather was clear."></textarea>
+          <button class="parse-btn" id="parse-btn" onclick="parseUpdate()">
+            <span id="parse-icon">✦</span> Extract with AI
+          </button>
+        </div>
+
+        <!-- Confidence indicator -->
+        <div id="confidence-wrap" style="display:none;margin:12px 0 20px;">
+          <div style="display:flex;justify-content:space-between;font-family:var(--font-m);font-size:10px;color:var(--text3);margin-bottom:4px;">
+            <span>AI EXTRACTION CONFIDENCE</span>
+            <span id="conf-pct">—</span>
+          </div>
+          <div class="conf-bar"><div class="conf-fill" id="conf-fill" style="width:0%;background:var(--green);"></div></div>
+          <div id="conf-note" style="font-size:11px;color:var(--text3);margin-top:4px;"></div>
+        </div>
+
+        <!-- Parsed fields (shown after extraction) -->
+        <div id="parsed-section" style="display:none;">
+          <div style="font-family:var(--font-m);font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">
+            ✦ Extracted Fields — Review &amp; Edit
+          </div>
+
+          <!-- Activity selector (always manual) -->
+          <div class="parsed-field">
+            <span class="field-icon">🏗️</span>
+            <span class="field-label">Activity</span>
+            <div class="field-val">
+              <select id="f-activity" required style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;">
+                <option value="">— Select Activity —</option>
+                {% for a in activities %}
+                <option value="{{ a.id }}">{{ a.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="parsed-field">
+            <span class="field-icon">👷</span>
+            <span class="field-label">Worker</span>
+            <input class="field-val" id="f-worker" value="{{ user.name if user else '' }}" placeholder="Your name">
+          </div>
+
+          <div class="parsed-field">
+            <span class="field-icon">🔧</span>
+            <span class="field-label">Work Type</span>
+            <div class="field-val">
+              <select id="f-worktype" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;">
+                <option>TBM Excavation</option><option>TBM Advance</option>
+                <option>Segment Erection</option><option>Dam Concrete Pouring</option>
+                <option>Metro Viaduct Construction</option><option>Highway Paving</option>
+                <option>Reinforcement Work</option><option>Earthwork / Excavation</option>
+                <option>Grouting / Waterproofing</option><option>Survey & Alignment</option>
+                <option>Equipment Maintenance</option><option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="parsed-field">
+            <span class="field-icon">📝</span>
+            <span class="field-label">Description</span>
+            <input class="field-val" id="f-desc" placeholder="Work description">
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+            <div class="parsed-field">
+              <span class="field-icon">📏</span>
+              <span class="field-label">Quantity</span>
+              <input class="field-val" id="f-qty" type="number" step="0.01" placeholder="0.00">
+            </div>
+            <div class="parsed-field">
+              <span class="field-icon">📐</span>
+              <span class="field-label">Unit</span>
+              <div class="field-val">
+                <select id="f-unit" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;">
+                  <option value="m">m</option><option value="km">km</option>
+                  <option value="m³">m³</option><option value="m²">m²</option>
+                  <option value="ton">ton</option><option value="rings">rings</option>
+                  <option value="panels">panels</option><option value="nos">nos</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+            <div class="parsed-field">
+              <span class="field-icon">⏱️</span>
+              <span class="field-label">Hours</span>
+              <input class="field-val" id="f-hours" type="number" step="0.5" placeholder="8">
+            </div>
+            <div class="parsed-field">
+              <span class="field-icon">👥</span>
+              <span class="field-label">Crew Size</span>
+              <input class="field-val" id="f-crew" type="number" placeholder="10">
+            </div>
+          </div>
+
+          <div class="parsed-field">
+            <span class="field-icon">⚠️</span>
+            <span class="field-label">Issue</span>
+            <div class="field-val">
+              <select id="f-issue" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;">
+                <option value="None">✓ None</option>
+                <option value="Equipment Breakdown">⚙ Equipment Breakdown</option>
+                <option value="Material Delay">📦 Material Delay</option>
+                <option value="Geological Issues">🪨 Geological Issues</option>
+                <option value="Labour Shortage">👷 Labour Shortage</option>
+                <option value="Safety Incident">⛑ Safety Incident</option>
+                <option value="Design Change">📐 Design Change</option>
+                <option value="Power Failure">⚡ Power Failure</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="parsed-field">
+            <span class="field-icon">🌤️</span>
+            <span class="field-label">Weather</span>
+            <div class="field-val">
+              <select id="f-weather" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;">
+                <option>Clear</option><option>Cloudy</option><option>Rain</option>
+                <option>Heavy Rain</option><option>Fog</option><option>Extreme Heat</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <form id="final-form" method="POST" action="/worker-update" style="margin-top:18px;">
+            <input type="hidden" name="user_id" value="{{ user.id if user else 1 }}">
+            <input type="hidden" name="activity_id"      id="ff-act">
+            <input type="hidden" name="worker_name"      id="ff-worker">
+            <input type="hidden" name="work_type"        id="ff-worktype">
+            <input type="hidden" name="work_description" id="ff-desc">
+            <input type="hidden" name="quantity_done"    id="ff-qty">
+            <input type="hidden" name="quantity_unit"    id="ff-unit">
+            <input type="hidden" name="hours_worked"     id="ff-hours">
+            <input type="hidden" name="crew_size"        id="ff-crew">
+            <input type="hidden" name="issue_type"       id="ff-issue">
+            <input type="hidden" name="weather_condition" id="ff-weather">
+            <button type="button" class="btn btn-primary" onclick="confirmSubmit()" style="width:100%;padding:13px;font-size:14px;">
+              ✓ Confirm &amp; Submit Update
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+
+function fillExample(el) {
+  document.getElementById('nlp-text').value = el.textContent.trim();
+  document.getElementById('nlp-text').focus();
+}
+
+async function parseUpdate() {
+  const text = document.getElementById('nlp-text').value.trim();
+  if (!text) { alert('Please describe your work first.'); return; }
+
+  const btn  = document.getElementById('parse-btn');
+  const icon = document.getElementById('parse-icon');
+  btn.disabled = true;
+  icon.textContent = '⏳';
+  btn.childNodes[1].textContent = ' Parsing…';
+
+  try {
+    const res  = await fetch('/api/parse-update', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({ text }),
+    });
+    const d = await res.json();
+
+    // Populate fields
+    if (d.work_type)  setSelectByText('f-worktype', d.work_type);
+    if (d.work_description) document.getElementById('f-desc').value = d.work_description;
+    if (d.quantity_done !== null && d.quantity_done !== undefined) document.getElementById('f-qty').value = d.quantity_done;
+    if (d.quantity_unit) setSelectByValue('f-unit', d.quantity_unit);
+    if (d.hours_worked !== null) document.getElementById('f-hours').value = d.hours_worked;
+    if (d.crew_size !== null)    document.getElementById('f-crew').value  = d.crew_size;
+    if (d.issue_type) setSelectByValue('f-issue', d.issue_type);
+    if (d.weather_condition) setSelectByValue('f-weather', d.weather_condition);
+    // Description fallback
+    if (!d.work_description) document.getElementById('f-desc').value = text;
+
+    // Confidence
+    const conf = d.confidence || 30;
+    const confWrap = document.getElementById('confidence-wrap');
+    confWrap.style.display = 'block';
+    document.getElementById('conf-pct').textContent = conf + '%';
+    const fill = document.getElementById('conf-fill');
+    fill.style.width = conf + '%';
+    fill.style.background = conf >= 70 ? 'var(--green)' : conf >= 45 ? 'var(--orange)' : 'var(--red)';
+
+    const source = d.source === 'llm' ? '✦ Extracted by Claude AI' : '⚙ Extracted by pattern matching — review carefully';
+    document.getElementById('conf-note').textContent = source;
+
+    document.getElementById('parsed-section').style.display = 'block';
+    document.getElementById('parsed-section').scrollIntoView({behavior:'smooth', block:'start'});
+
+  } catch(e) {
+    alert('Parse failed: ' + e.message);
+  }
+
+  btn.disabled = false;
+  icon.textContent = '✦';
+  btn.childNodes[1].textContent = ' Extract with AI';
+}
+
+function setSelectByText(id, text) {
+  const sel = document.getElementById(id);
+  const lower = text.toLowerCase();
+  for (let opt of sel.options) {
+    if (opt.text.toLowerCase().includes(lower) || lower.includes(opt.text.toLowerCase().split(' ')[0].toLowerCase())) {
+      sel.value = opt.value; return;
+    }
+  }
+}
+function setSelectByValue(id, val) {
+  const sel = document.getElementById(id);
+  for (let opt of sel.options) {
+    if (opt.value === val || opt.text === val) { sel.value = opt.value; return; }
+  }
+}
+
+function confirmSubmit() {
+  const actId = document.getElementById('f-activity').value;
+  if (!actId) { alert('Please select an Activity.'); return; }
+
+  document.getElementById('ff-act').value     = actId;
+  document.getElementById('ff-worker').value  = document.getElementById('f-worker').value;
+  document.getElementById('ff-worktype').value= document.getElementById('f-worktype').value;
+  document.getElementById('ff-desc').value    = document.getElementById('f-desc').value;
+  document.getElementById('ff-qty').value     = document.getElementById('f-qty').value;
+  document.getElementById('ff-unit').value    = document.getElementById('f-unit').value;
+  document.getElementById('ff-hours').value   = document.getElementById('f-hours').value;
+  document.getElementById('ff-crew').value    = document.getElementById('f-crew').value;
+  document.getElementById('ff-issue').value   = document.getElementById('f-issue').value;
+  document.getElementById('ff-weather').value = document.getElementById('f-weather').value;
+  document.getElementById('final-form').submit();
+}
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

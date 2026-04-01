@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>👷 Register</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            background: linear-gradient(135deg, #F9A826, #2F5D62);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            background: #ffffff;
+            width: 380px;
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+        h2 {
+            text-align: center;
+            color: #2F5D62;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #F9A826;
+            color: #2C2C2C;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .link {
+            text-align: center;
+            margin-top: 12px;
+        }
+        a {
+            color: #2F5D62;
+            font-weight: bold;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+<div class="card">
+    <h2>👷 Worker / Supervisor Register</h2>
+
+    <form action="/register" method="post">
+        <input name="name" placeholder="Full Name" required>
+        <input name="email" placeholder="Email" required>
+        <input name="password" type="password" placeholder="Password" required>
+
+        <select name="role" required>
+            <option value="">Select Role</option>
+            <option value="worker">Worker</option>
+            <option value="supervisor">Supervisor</option>
+        </select>
+
+        <button type="submit">Create Account</button>
+    </form>
+
+    <div class="link">
+        Already registered? <a href="/">Login</a>
+    </div>
+</div>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

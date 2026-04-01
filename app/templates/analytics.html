@@ -1,0 +1,395 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Analytics — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* ── Site Health Score gauge ─────────────────────────────── */
+.health-gauge {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding: 28px 20px;
+}
+.gauge-ring {
+  width:160px; height:160px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+  background: conic-gradient(
+    var(--gauge-color, #10B981) var(--gauge-pct, 0turn),
+    var(--surface3) 0turn
+  );
+}
+.gauge-inner {
+  width:120px; height:120px; border-radius:50%;
+  background:var(--surface);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.gauge-score { font-family:var(--font-d); font-size:36px; font-weight:800; line-height:1; }
+.gauge-grade {
+  font-family:var(--font-m); font-size:14px; font-weight:700;
+  letter-spacing:1px; margin-top:2px;
+}
+.gauge-label { font-family:var(--font-m); font-size:10px; color:var(--text3); margin-top:12px; letter-spacing:2px; text-transform:uppercase; }
+
+/* ── EVM table ───────────────────────────────────────────── */
+.evm-pill {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:3px 9px; border-radius:20px; font-size:11px;
+  font-family:var(--font-m); font-weight:600;
+}
+
+/* ── Heatmap ─────────────────────────────────────────────── */
+.heatmap-grid { display:grid; grid-template-columns:40px repeat(24,1fr); gap:2px; margin-top:8px; }
+.hm-cell {
+  height:22px; border-radius:3px;
+  background:var(--surface3);
+  transition:opacity .2s;
+  cursor:default;
+  position:relative;
+}
+.hm-cell:hover::after {
+  content:attr(data-tip);
+  position:absolute;
+  bottom:calc(100% + 4px); left:50%; transform:translateX(-50%);
+  background:var(--surface); border:1px solid var(--border);
+  padding:4px 8px; border-radius:5px; font-size:10px;
+  white-space:nowrap; color:var(--text); z-index:10;
+  font-family:var(--font-m);
+  pointer-events:none;
+}
+.hm-label { display:flex; align-items:center; justify-content:center; font-family:var(--font-m); font-size:9px; color:var(--text3); }
+.hm-hour-labels { display:grid; grid-template-columns:40px repeat(24,1fr); gap:2px; margin-bottom:4px; }
+
+/* ── Delay card ──────────────────────────────────────────── */
+.delay-card { background:var(--surface2); border-radius:10px; padding:14px 16px; border-left:3px solid var(--delay-color, var(--green)); margin-bottom:10px; }
+.delay-name { font-weight:700; font-size:13px; margin-bottom:6px; }
+.delay-meta { display:flex; flex-wrap:wrap; gap:12px; font-family:var(--font-m); font-size:11px; color:var(--text3); }
+.delay-meta span strong { color:var(--text); }
+
+/* ── Weather icons ───────────────────────────────────────── */
+.wx-row { display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+.wx-icon { font-size:24px; width:36px; text-align:center; }
+</style>
+</head>
+<body>
+<body data-uid="{{ user.id if user else 1 }}"></body>
+<div class="app-layout">
+  {{ sidebar(user, 'analytics', 'supervisor') }}
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">📊 Advanced Analytics</div>
+      <div class="topbar-right">
+        <button class="btn btn-outline btn-sm" onclick="loadAll()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="page">
+
+      <!-- ROW 1: Site Health + Delay Forecast -->
+      <div class="g2">
+
+        <!-- SITE HEALTH SCORE -->
+        <div class="card">
+          <div class="card-title">🏥 Site Health Score</div>
+          <div class="card-sub">Composite 0–100 across all activities</div>
+          <div class="health-gauge" id="health-gauge">
+            <div style="text-align:center;color:var(--text3);padding:20px;">Loading…</div>
+          </div>
+          <div id="health-components"></div>
+        </div>
+
+        <!-- AI DELAY PREDICTOR -->
+        <div class="card">
+          <div class="card-title">🔮 AI Delay Predictor</div>
+          <div class="card-sub">Linear trend forecast — estimated completion vs planned end</div>
+          <div id="delay-cards">
+            <div style="text-align:center;color:var(--text3);padding:20px;">Loading forecasts…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 2: EVM Table -->
+      <div class="card mt5">
+        <div class="card-title">💰 Earned Value Management (EVM)</div>
+        <div class="card-sub">SPI (Schedule) · CPI (Cost) · EAC (Estimate at Completion) — Budget rate: ₹2,500/crew-day</div>
+        <div id="evm-table">
+          <div style="text-align:center;color:var(--text3);padding:20px;">Loading EVM data…</div>
+        </div>
+      </div>
+
+      <!-- ROW 3: Delay Forecast Chart -->
+      <div class="card mt5">
+        <div class="card-title">📈 7-Day Advance Forecast</div>
+        <div class="card-sub">Select an activity to view projected cumulative progress</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;" id="forecast-btns"></div>
+        <canvas id="forecastChart" style="max-height:260px;"></canvas>
+        <div id="forecast-empty" style="text-align:center;padding:28px;color:var(--text3);">Click an activity above.</div>
+      </div>
+
+      <!-- ROW 4: Productivity Heatmap -->
+      <div class="card mt5">
+        <div class="card-title">🔥 Productivity Heatmap</div>
+        <div class="card-sub">Average quantity completed — by hour of day × day of week</div>
+        <div class="hm-hour-labels" id="hm-hours"></div>
+        <div id="heatmap-grid">
+          <div style="text-align:center;color:var(--text3);padding:20px;">Loading heatmap…</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;color:var(--text3);font-family:var(--font-m);">
+          <span>Low</span>
+          <div style="display:flex;gap:3px;">
+            <div style="width:16px;height:14px;border-radius:3px;background:rgba(245,166,35,0.1);"></div>
+            <div style="width:16px;height:14px;border-radius:3px;background:rgba(245,166,35,0.3);"></div>
+            <div style="width:16px;height:14px;border-radius:3px;background:rgba(245,166,35,0.6);"></div>
+            <div style="width:16px;height:14px;border-radius:3px;background:rgba(245,166,35,0.85);"></div>
+            <div style="width:16px;height:14px;border-radius:3px;background:rgba(245,166,35,1);"></div>
+          </div>
+          <span>High</span>
+        </div>
+      </div>
+
+      <!-- ROW 5: Weather Impact -->
+      <div class="card mt5">
+        <div class="card-title">🌤️ Weather Impact Analysis</div>
+        <div class="card-sub">Avg productivity (qty/hour) and issue rate by weather condition</div>
+        <div id="weather-table">
+          <div style="text-align:center;color:var(--text3);padding:20px;">Loading…</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+window.CTWIN_USER_ID = USER_ID;
+
+let forecastChartInst;
+
+async function loadAll() {
+  await Promise.all([loadHealth(), loadDelay(), loadEVM(), loadHeatmap(), loadWeather()]);
+}
+
+// ── SITE HEALTH ──────────────────────────────────────────────────────────────
+async function loadHealth() {
+  const d = await fetch('/api/site-health').then(r=>r.json());
+  const score = d.health_score;
+  const grade = d.grade;
+  const col   = score>=80?'var(--green)':score>=60?'var(--orange)':'var(--red)';
+  const pct   = score/100;
+
+  document.getElementById('health-gauge').innerHTML = `
+    <div class="gauge-ring" style="--gauge-color:${col};--gauge-pct:${pct}turn;">
+      <div class="gauge-inner">
+        <div class="gauge-score" style="color:${col};">${score}</div>
+        <div class="gauge-grade" style="color:${col};">${grade}</div>
+      </div>
+    </div>
+    <div class="gauge-label">Site Health Score</div>
+  `;
+
+  const c = d.components || {};
+  const comps = [
+    {label:'Progress Velocity',  key:'progress_velocity', icon:'📈'},
+    {label:'Risk Health',         key:'risk_health',        icon:'🛡️'},
+    {label:'Utilization',         key:'utilization',        icon:'⚡'},
+    {label:'Safety',              key:'safety',             icon:'⛑️'},
+    {label:'Issue-Free Rate',     key:'issue_free_rate',    icon:'✅'},
+  ];
+  document.getElementById('health-components').innerHTML =
+    '<div style="display:flex;flex-direction:column;gap:7px;margin-top:14px;">' +
+    comps.map(comp => {
+      const v = c[comp.key] || 0;
+      const cc = v>=70?'var(--green)':v>=50?'var(--orange)':'var(--red)';
+      return `<div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+          <span style="font-size:12px;">${comp.icon} ${comp.label}</span>
+          <span style="font-family:var(--font-m);font-size:11px;color:${cc};">${v}%</span>
+        </div>
+        <div class="pbar"><div class="pbar-fill" style="width:${v}%;background:${cc};"></div></div>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+// ── DELAY PREDICTOR ──────────────────────────────────────────────────────────
+async function loadDelay() {
+  const data = await fetch('/api/delay-forecast').then(r=>r.json());
+  const cont  = document.getElementById('delay-cards');
+  const btns  = document.getElementById('forecast-btns');
+
+  cont.innerHTML = data.map(d => {
+    if (d.status === 'NO DATA') return `
+      <div class="delay-card" style="--delay-color:var(--text3);">
+        <div class="delay-name">${d.name}</div>
+        <span class="badge badge-gray">NO DATA YET</span>
+      </div>`;
+    const bc = d.on_time?'badge-green':'badge-red';
+    return `<div class="delay-card" style="--delay-color:${d.delay_color};">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div class="delay-name">${d.name}</div>
+        <span class="badge ${bc}">${d.delay_label}</span>
+      </div>
+      <div class="delay-meta">
+        <span>Progress: <strong>${d.progress_pct}%</strong></span>
+        <span>ETA: <strong>${d.eta}</strong></span>
+        <span>Planned End: <strong>${d.planned_end}</strong></span>
+        <span>Adv/Day: <strong>${d.advance_per_day}${d.unit}</strong></span>
+        <span>Confidence: <strong>${d.confidence}%</strong></span>
+        ${d.delay_days>0?`<span style="color:var(--red);">Delay: <strong>+${d.delay_days} days</strong></span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Forecast buttons
+  btns.innerHTML = data.filter(d=>d.status!=='NO DATA').map(d =>
+    `<button class="btn btn-outline btn-sm" onclick="loadForecast(${d.activity_id},'${d.name}',${JSON.stringify(d.forecast_7d)})">${d.name}</button>`
+  ).join('');
+}
+
+async function loadForecast(id, name, forecast7d) {
+  document.getElementById('forecast-empty').style.display='none';
+
+  // Get historical timeline
+  const hist = await fetch(`/api/timeline/${id}`).then(r=>r.json());
+  const histDates = hist.map(d=>d.date);
+  const histCum   = hist.map(d=>d.cumulative);
+
+  // Forecast
+  const forecastDates = forecast7d.map(f=>f.date);
+  const forecastCum   = forecast7d.map(f=>f.projected_cumulative);
+
+  // Combine
+  const allDates = [...histDates, ...forecastDates];
+
+  if (forecastChartInst) forecastChartInst.destroy();
+  forecastChartInst = new Chart(document.getElementById('forecastChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: allDates,
+      datasets: [
+        {
+          label: 'Historical',
+          data: [...histCum, ...new Array(7).fill(null)],
+          borderColor: '#F5A623', backgroundColor: 'rgba(245,166,35,.08)',
+          fill: true, tension: .4, pointRadius: 2,
+        },
+        {
+          label: '7-Day AI Forecast',
+          data: [...new Array(histDates.length > 0 ? histDates.length - 1 : 0).fill(null),
+                 histCum.length > 0 ? histCum[histCum.length-1] : null,
+                 ...forecastCum],
+          borderColor: '#8B5CF6', backgroundColor: 'rgba(139,92,246,.06)',
+          fill: true, tension: .4, pointRadius: 3, borderDash: [6,3],
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color:'#A1A1AA', font:{size:11} } },
+        title: { display:true, text:`${name} — Forecast`, color:'#A1A1AA', font:{size:12} }
+      },
+      scales: {
+        x:{ ticks:{color:'#71717A',font:{size:9}},grid:{color:'rgba(255,255,255,.03)'},maxTicksLimit:12 },
+        y:{ ticks:{color:'#71717A'}, grid:{color:'rgba(255,255,255,.03)'} }
+      }
+    }
+  });
+}
+
+// ── EVM ──────────────────────────────────────────────────────────────────────
+async function loadEVM() {
+  const data = await fetch('/api/evm').then(r=>r.json());
+  const cont = document.getElementById('evm-table');
+
+  function spiColor(v) { return v>=1?'var(--green)':v>=.8?'var(--orange)':'var(--red)'; }
+  function fmt(n) { return n >= 1e7 ? `₹${(n/1e7).toFixed(2)}Cr` : n >= 1e5 ? `₹${(n/1e5).toFixed(1)}L` : `₹${Math.round(n).toLocaleString('en-IN')}`; }
+
+  cont.innerHTML = `<table class="tbl">
+    <thead><tr>
+      <th>Activity</th>
+      <th title="Planned Value">PV</th>
+      <th title="Earned Value">EV</th>
+      <th title="Actual Cost">AC</th>
+      <th title="Schedule Performance Index = EV/PV">SPI</th>
+      <th title="Cost Performance Index = EV/AC">CPI</th>
+      <th title="Schedule Variance">SV</th>
+      <th title="Cost Variance">CV</th>
+      <th title="Estimate at Completion">EAC</th>
+    </tr></thead>
+    <tbody>${data.map(d=>`<tr>
+      <td style="font-size:12px;font-weight:600;">${d.name}</td>
+      <td style="font-family:var(--font-m);font-size:11px;">${fmt(d.pv)}</td>
+      <td style="font-family:var(--font-m);font-size:11px;">${fmt(d.ev)}</td>
+      <td style="font-family:var(--font-m);font-size:11px;">${fmt(d.ac)}</td>
+      <td>
+        <span class="evm-pill" style="background:${spiColor(d.spi)}22;color:${spiColor(d.spi)};">${d.spi}</span>
+      </td>
+      <td>
+        <span class="evm-pill" style="background:${spiColor(d.cpi)}22;color:${spiColor(d.cpi)};">${d.cpi}</span>
+      </td>
+      <td style="font-family:var(--font-m);font-size:11px;color:${d.sv>=0?'var(--green)':'var(--red)'};">${d.sv>=0?'+':''}${fmt(d.sv)}</td>
+      <td style="font-family:var(--font-m);font-size:11px;color:${d.cv>=0?'var(--green)':'var(--red)'};">${d.cv>=0?'+':''}${fmt(d.cv)}</td>
+      <td style="font-family:var(--font-m);font-size:11px;color:var(--orange);">${fmt(d.eac)}</td>
+    </tr>`).join('')}</tbody>
+  </table>
+  <div style="font-size:11px;color:var(--text3);margin-top:10px;font-family:var(--font-m);">
+    SPI/CPI ≥1.0 = good &nbsp;|&nbsp; SV/CV positive = ahead of plan &nbsp;|&nbsp; EAC = projected final cost
+  </div>`;
+}
+
+// ── PRODUCTIVITY HEATMAP ─────────────────────────────────────────────────────
+async function loadHeatmap() {
+  const data = await fetch('/api/productivity-heatmap').then(r=>r.json());
+  const maxQty = Math.max(...data.map(d=>d.avg_qty), 0.001);
+
+  // Hour labels
+  const hourLabels = document.getElementById('hm-hours');
+  hourLabels.innerHTML = '<div></div>' + Array.from({length:24},(_,h)=>
+    `<div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-align:center;">${h}</div>`
+  ).join('');
+
+  // Grid
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let html = '';
+  for (let d=0; d<7; d++) {
+    html += `<div class="hm-label">${days[d]}</div>`;
+    for (let h=0; h<24; h++) {
+      const cell = data.find(x=>x.day_idx===d && x.hour===h);
+      const qty  = cell ? cell.avg_qty : 0;
+      const op   = qty > 0 ? Math.max(0.08, qty/maxQty) : 0.04;
+      const tip  = `${days[d]} ${h}:00 — avg ${qty} qty (${cell?.count||0} updates)`;
+      html += `<div class="hm-cell" style="background:rgba(245,166,35,${op.toFixed(2)});" data-tip="${tip}"></div>`;
+    }
+  }
+  document.getElementById('heatmap-grid').innerHTML = `<div class="heatmap-grid">${html}</div>`;
+}
+
+// ── WEATHER IMPACT ────────────────────────────────────────────────────────────
+async function loadWeather() {
+  const data = await fetch('/api/weather-impact').then(r=>r.json());
+  const icons = {'Clear':'☀️','Cloudy':'☁️','Rain':'🌧️','Heavy Rain':'⛈️','Fog':'🌫️','Extreme Heat':'🔥','Unknown':'❓'};
+  const maxQty = Math.max(...data.map(d=>d.avg_qty_per_hr), 0.01);
+
+  document.getElementById('weather-table').innerHTML = data.map(d=>`
+    <div class="wx-row">
+      <div class="wx-icon">${icons[d.weather]||'🌡️'}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;">${d.weather}</div>
+        <div class="pbar" style="width:200px;">
+          <div class="pbar-fill" style="width:${(d.avg_qty_per_hr/maxQty*100).toFixed(0)}%;background:var(--accent);"></div>
+        </div>
+      </div>
+      <div style="text-align:right;min-width:160px;">
+        <div style="font-family:var(--font-m);font-size:12px;"><strong>${d.avg_qty_per_hr}</strong> qty/hr</div>
+        <div style="font-family:var(--font-m);font-size:11px;color:var(--text3);">${d.update_count} updates · Issue rate: ${d.issue_rate_pct}%</div>
+      </div>
+    </div>`).join('') || '<p style="color:var(--text3);padding:16px;">No weather data yet.</p>';
+}
+
+loadAll();
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

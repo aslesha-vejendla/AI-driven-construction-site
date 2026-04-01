@@ -1,0 +1,281 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Digital Twin — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.twin-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:18px;
+  position:relative;
+  overflow:hidden;
+  transition:all .2s;
+  cursor:pointer;
+}
+.twin-card:hover {
+  transform:translateY(-3px);
+  box-shadow:0 8px 28px rgba(0,0,0,.4);
+}
+.twin-card .top-bar {
+  position:absolute;
+  top:0;left:0;right:0;height:3px;
+}
+.twin-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:16px;
+  margin-bottom:22px;
+}
+.metric-row {
+  display:flex;justify-content:space-between;
+  padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:12px;
+}
+.metric-row:last-child{border-bottom:none}
+.metric-key{color:var(--text3);font-family:var(--font-m);font-size:10px;text-transform:uppercase;letter-spacing:.8px;}
+.metric-val{font-family:var(--font-m);font-weight:600;}
+
+/* Detail panel */
+#detail-panel {
+  display:none;
+  position:fixed;
+  top:0;right:0;
+  width:420px;height:100vh;
+  background:var(--surface);
+  border-left:1px solid var(--border2);
+  z-index:500;
+  overflow-y:auto;
+  box-shadow:-8px 0 32px rgba(0,0,0,.5);
+  animation:slideRight .2s ease;
+}
+@keyframes slideRight{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+#detail-panel.open{display:block}
+#detail-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.4);z-index:499;
+}
+#detail-overlay.open{display:block}
+</style>
+</head>
+<body data-uid="{{ user.id if user else 1 }}">
+
+<div class="app-layout">
+  {{ sidebar(user, 'twin', 'supervisor') }}
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">🛰 Digital Twin</div>
+      <div class="topbar-right">
+        <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);"></span>
+        <span id="last-refresh" style="font-family:var(--font-m);font-size:10px;color:var(--text3);"></span>
+        <button class="btn btn-outline btn-sm" onclick="loadTwin()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="page">
+
+      <!-- Summary stats -->
+      <div class="stats-row" id="summary-stats">
+        <div class="stat-card fade-up">
+          <div class="stat-lbl">Activities</div>
+          <div class="stat-val" id="s-total">—</div>
+          <div class="stat-sub">Being monitored</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--green)">
+          <div class="stat-lbl">On Track</div>
+          <div class="stat-val" id="s-ok" style="color:var(--green)">—</div>
+          <div class="stat-sub">Progressing well</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--orange)">
+          <div class="stat-lbl">Medium Risk</div>
+          <div class="stat-val" id="s-med" style="color:var(--orange)">—</div>
+          <div class="stat-sub">Needs attention</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--red)">
+          <div class="stat-lbl">High Risk</div>
+          <div class="stat-val" id="s-high" style="color:var(--red)">—</div>
+          <div class="stat-sub">Immediate action</div>
+        </div>
+        <div class="stat-card fade-up" style="--stat-color:var(--accent2)">
+          <div class="stat-lbl">Avg Progress</div>
+          <div class="stat-val" id="s-pct">—</div>
+          <div class="stat-sub">Across all activities</div>
+        </div>
+      </div>
+
+      <!-- Risk chart -->
+      <div class="card mb3 fade-up">
+        <div class="card-title">🔴 Risk Score Overview</div>
+        <div class="card-sub">Click any activity card below to see details · Higher score = more critical</div>
+        <canvas id="riskChart" style="max-height:180px;"></canvas>
+      </div>
+
+      <!-- Twin cards grid -->
+      <div class="section-divider">Live Activity Status — click a card for details</div>
+      <div class="twin-grid" id="twin-grid">
+        <div style="grid-column:1/-1;text-align:center;color:var(--text3);padding:32px;">
+          Loading digital twin data…
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Detail side panel -->
+<div id="detail-overlay" onclick="closeDetail()"></div>
+<div id="detail-panel">
+  <div style="padding:20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+    <div style="font-family:var(--font-d);font-size:15px;font-weight:700;" id="dp-title">Activity Detail</div>
+    <button class="btn btn-ghost btn-sm" onclick="closeDetail()">✕ Close</button>
+  </div>
+  <div id="dp-content" style="padding:20px;"></div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+var riskInst;
+var twinData = [];
+
+setInterval(function() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN',{hour12:false}) + ' IST';
+}, 1000);
+
+async function loadTwin() {
+  var data = await fetch('/digital-twin').then(function(r){return r.json();});
+  twinData = data;
+
+  /* Summary stats */
+  document.getElementById('s-total').textContent = data.length;
+  document.getElementById('s-ok').textContent    = data.filter(function(d){return d.status==='ON TRACK';}).length;
+  document.getElementById('s-med').textContent   = data.filter(function(d){return d.status==='MEDIUM RISK';}).length;
+  document.getElementById('s-high').textContent  = data.filter(function(d){return d.status==='HIGH RISK';}).length;
+  var avgPct = data.length ? Math.round(data.reduce(function(s,d){return s+d.progress_pct;},0)/data.length) : 0;
+  document.getElementById('s-pct').textContent   = avgPct + '%';
+
+  document.getElementById('last-refresh').textContent =
+    'Updated ' + new Date().toLocaleTimeString('en-IN',{hour12:false});
+
+  /* Risk chart */
+  var labels = data.map(function(d){return d.activity.length>16?d.activity.substr(0,14)+'…':d.activity;});
+  if (riskInst) riskInst.destroy();
+  riskInst = new Chart(document.getElementById('riskChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:labels,datasets:[{
+      label:'Risk Score',
+      data:data.map(function(d){return d.risk_score;}),
+      backgroundColor:data.map(function(d){return d.color+'55';}),
+      borderColor:data.map(function(d){return d.color;}),
+      borderWidth:2,borderRadius:6
+    }]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#71717A',font:{size:10}},grid:{color:'rgba(255,255,255,.03)'}},
+        y:{min:0,max:100,ticks:{color:'#71717A'},grid:{color:'rgba(255,255,255,.03)'},
+          annotations:{line65:{type:'line',yMin:65,yMax:65,borderColor:'rgba(239,68,68,.4)',borderWidth:1,borderDash:[4,4]}}}
+      }
+    }
+  });
+
+  /* Twin cards */
+  var grid = document.getElementById('twin-grid');
+  if (!data.length) {
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text3);padding:32px;">No activities found. Run python seed.py first.</div>';
+    return;
+  }
+  grid.innerHTML = data.map(function(d, i) {
+    var pct = Math.min(d.progress_pct||0, 100);
+    var bc  = d.status==='ON TRACK'?'badge-green':d.status==='MEDIUM RISK'?'badge-yellow':'badge-red';
+    return '<div class="twin-card fade-up" onclick="showDetail('+i+')" style="animation-delay:'+(i*0.05)+'s">' +
+      '<div class="top-bar" style="background:'+d.color+';"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+        '<div>' +
+          '<div style="font-family:var(--font-d);font-size:14px;font-weight:800;margin-bottom:3px;">'+d.activity+'</div>' +
+          '<div style="font-size:10px;color:var(--text3);font-family:var(--font-m);">'+d.activity_type+'</div>' +
+        '</div>' +
+        '<span class="badge '+bc+'">'+d.status+'</span>' +
+      '</div>' +
+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">' +
+        '<div style="font-family:var(--font-d);font-size:36px;font-weight:800;color:'+d.color+';">'+d.risk_score+'</div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Risk Score</div>' +
+          '<div class="pbar" style="height:6px;"><div class="pbar-fill" style="width:'+d.risk_score+'%;background:'+d.color+';"></div></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="metric-row">' +
+        '<span class="metric-key">Progress</span>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end;">' +
+          '<div class="pbar" style="width:80px;"><div class="pbar-fill" style="width:'+pct+'%;background:var(--accent2);"></div></div>' +
+          '<span class="metric-val" style="color:var(--accent2);">'+d.progress_pct+'%</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="metric-row"><span class="metric-key">Utilization</span><span class="metric-val">'+d.utilization+'%</span></div>' +
+      '<div class="metric-row"><span class="metric-key">Advance/Day</span><span class="metric-val">'+d.advance_per_day+' '+d.unit+'</span></div>' +
+      '<div class="metric-row"><span class="metric-key">Downtime</span><span class="metric-val" style="color:'+(d.downtime_events>0?'var(--orange)':'var(--green)')+';">'+d.downtime_events+' events</span></div>' +
+      '<div class="metric-row"><span class="metric-key">Crew</span><span class="metric-val">'+d.avg_crew+' workers</span></div>' +
+
+      '<div style="margin-top:12px;padding:10px;background:var(--surface2);border-radius:var(--radius-sm);font-size:11px;color:var(--text2);line-height:1.5;">'+
+        d.insight+
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function showDetail(idx) {
+  var d = twinData[idx];
+  if (!d) return;
+  document.getElementById('dp-title').textContent = d.activity;
+  document.getElementById('dp-content').innerHTML =
+    '<div style="margin-bottom:16px;">' +
+      '<span class="badge '+(d.status==='ON TRACK'?'badge-green':d.status==='MEDIUM RISK'?'badge-yellow':'badge-red')+'" style="font-size:12px;padding:5px 12px;">'+d.status+'</span>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">'+
+      kpiBox('Risk Score', d.risk_score, d.color) +
+      kpiBox('Progress', d.progress_pct+'%', 'var(--accent2)') +
+      kpiBox('Utilization', d.utilization+'%', 'var(--purple)') +
+      kpiBox('Advance/Day', d.advance_per_day+' '+d.unit, 'var(--green)') +
+      kpiBox('Downtime', d.downtime_events+' events', d.downtime_events>0?'var(--orange)':'var(--green)') +
+      kpiBox('Avg Crew', d.avg_crew+' workers', 'var(--accent)') +
+      kpiBox('Updates', d.update_count, 'var(--text2)') +
+      kpiBox('Days Active', d.days_active, 'var(--text2)') +
+    '</div>' +
+    '<div style="padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;">' +
+      '<div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Latest Insight</div>' +
+      '<div style="font-size:13px;color:var(--text2);line-height:1.6;">'+d.insight+'</div>' +
+    '</div>' +
+    '<div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Progress</div>' +
+    '<div class="pbar pbar-lg" style="margin-bottom:4px;"><div class="pbar-fill" style="width:'+Math.min(d.progress_pct,100)+'%;background:var(--accent2);"></div></div>' +
+    '<div style="font-family:var(--font-m);font-size:11px;color:var(--text3);">'+d.total_qty+' '+d.unit+' of '+d.planned_qty+' '+d.unit+' planned</div>';
+
+  document.getElementById('detail-panel').classList.add('open');
+  document.getElementById('detail-overlay').classList.add('open');
+}
+
+function kpiBox(label, value, color) {
+  return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center;">' +
+    '<div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:'+color+';">'+value+'</div>' +
+    '<div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:4px;">'+label+'</div>' +
+  '</div>';
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  document.getElementById('detail-overlay').classList.remove('open');
+}
+
+loadTwin();
+setInterval(loadTwin, 30000);
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>

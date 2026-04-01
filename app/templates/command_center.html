@@ -1,0 +1,572 @@
+{% from "_sidebar.html" import sidebar %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Command Center — ConstructTwin</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* War room styling */
+body { overflow-x: hidden; }
+
+.cc-header {
+  background: linear-gradient(135deg, rgba(245,166,35,.08), rgba(239,68,68,.05), rgba(59,130,246,.06));
+  border-bottom: 1px solid var(--border);
+  padding: 0 26px;
+  height: 58px; display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+}
+.cc-title { font-family: var(--font-d); font-size: 16px; font-weight: 800; display:flex;align-items:center;gap:10px; }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  animation: blink 1.4s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+/* Ticker tape */
+.ticker-wrap {
+  background: rgba(245,166,35,.06);
+  border-top: 1px solid rgba(245,166,35,.15);
+  border-bottom: 1px solid rgba(245,166,35,.15);
+  overflow: hidden; height: 34px;
+  display: flex; align-items: center;
+}
+.ticker-inner {
+  display: flex; gap: 0;
+  animation: scroll-ticker 40s linear infinite;
+  white-space: nowrap;
+}
+@keyframes scroll-ticker { from{transform:translateX(100vw)} to{transform:translateX(-100%)} }
+.ticker-item {
+  padding: 0 32px;
+  font-family: var(--font-m); font-size: 11px; color: var(--text2);
+  border-right: 1px solid rgba(245,166,35,.2);
+  display: flex; align-items: center; gap: 7px;
+}
+
+/* Big number displays */
+.cc-metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  position: relative; overflow: hidden;
+  text-align: center;
+}
+.cc-metric::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: var(--m-color, var(--accent));
+}
+.cc-metric-val { font-family: var(--font-d); font-size: 42px; font-weight: 800; line-height: 1; }
+.cc-metric-lbl { font-family: var(--font-m); font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 2px; margin-top: 5px; }
+
+/* Activity live cards */
+.live-act {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px;
+  border-left: 4px solid var(--la-color, var(--border));
+  transition: all .3s;
+}
+.live-act.pulse-new { animation: newpulse .6s ease; }
+@keyframes newpulse { from{background:rgba(245,166,35,.12)} to{background:var(--surface2)} }
+
+/* Anomaly alerts */
+.anomaly-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; border-radius: 9px; margin-bottom: 8px;
+  border-left: 4px solid var(--a-color);
+  background: var(--a-bg);
+}
+.anomaly-icon { font-size: 22px; flex-shrink: 0; }
+
+/* AI Report panel */
+.report-panel {
+  background: var(--surface2); border-radius: 12px;
+  border: 1px solid rgba(245,166,35,.2);
+  padding: 20px; white-space: pre-wrap;
+  font-size: 12.5px; line-height: 1.8; color: var(--text2);
+  max-height: 480px; overflow-y: auto;
+  font-family: var(--font-b);
+}
+
+/* Command grid */
+.cc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.cc-grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+</style>
+</head>
+<body>
+<body data-uid="{{ user.id if user else 1 }}"></body>
+<div class="app-layout">
+  {{ sidebar(user, 'command', user.role if user else 'supervisor') }}
+  <div class="main">
+    <!-- Custom header -->
+    <div class="cc-header">
+      <div class="cc-title">
+        <div class="live-dot"></div>
+        🖥️ Command Center
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="cc-clock" style="font-family:var(--font-m);font-size:13px;color:var(--accent);"></span>
+        <span style="font-family:var(--font-m);font-size:10px;color:var(--text3);">AUTO-REFRESH 15s</span>
+        <button class="btn btn-outline btn-sm" onclick="loadAll()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <!-- Live ticker -->
+    <div class="ticker-wrap">
+      <div class="ticker-inner" id="ticker">
+        <div class="ticker-item">⏳ Loading live feed…</div>
+      </div>
+    </div>
+
+    <div class="page">
+
+      <!-- Big KPIs -->
+      <div class="cc-grid">
+        <div class="cc-metric">
+          <div class="cc-metric-val" id="kpi-health" style="color:var(--green);">—</div>
+          <div class="cc-metric-lbl">Site Health Score</div>
+        </div>
+        <div class="cc-metric" style="--m-color:var(--red);">
+          <div class="cc-metric-val" id="kpi-risk" style="color:var(--red);">—</div>
+          <div class="cc-metric-lbl">High Risk Activities</div>
+        </div>
+        <div class="cc-metric" style="--m-color:var(--accent2);">
+          <div class="cc-metric-val" id="kpi-updates" style="color:var(--accent2);">—</div>
+          <div class="cc-metric-lbl">Total Field Updates</div>
+        </div>
+      </div>
+
+      <div class="cc-grid-2">
+        <div>
+          <!-- Live activity status grid -->
+          <div class="card" style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <div class="card-title">📡 Live Activity Status</div>
+              <span style="font-family:var(--font-m);font-size:9px;color:var(--green);">● LIVE</span>
+            </div>
+            <div id="live-activities">
+              <div style="text-align:center;color:var(--text3);padding:20px;">Loading…</div>
+            </div>
+          </div>
+
+          <!-- Risk trend mini chart -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">📉 Risk Velocity</div>
+            <div class="card-sub">Are risks improving or worsening over time?</div>
+            <canvas id="riskTrendChart" style="max-height:180px;"></canvas>
+          </div>
+
+          <!-- AI Weekly Report Generator -->
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <div>
+                <div class="card-title">🗒️ AI Weekly Report</div>
+                <div class="card-sub">One click → full project status report</div>
+              </div>
+              <button class="btn btn-primary btn-sm" id="report-btn" onclick="generateReport()">
+                ✦ Generate Report
+              </button>
+            </div>
+            <div id="report-panel" style="display:none;">
+              <div class="report-panel" id="report-text"></div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="btn btn-outline btn-sm" onclick="copyReport()">📋 Copy</button>
+                <button class="btn btn-outline btn-sm" onclick="downloadReport()">⬇ Download .txt</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <!-- Anomaly detector -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">🔍 Detect your anomaly</div>
+            <div class="card-sub">Statistically unusual entries</div>
+            <div id="anomalies">
+              <div style="text-align:center;color:var(--text3);padding:20px;">Analyzing…</div>
+            </div>
+          </div>
+
+          <!-- Unread alerts -->
+          <div class="card" style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div class="card-title">🔔 Active Alerts</div>
+              <button class="btn btn-outline btn-sm" onclick="markAllRead()">Clear all</button>
+            </div>
+            <div id="cc-alerts">
+              <div style="text-align:center;color:var(--text3);padding:16px;">Loading…</div>
+            </div>
+          </div>
+
+          <!-- Last 5 updates micro feed -->
+          <div class="card">
+            <div class="card-title">⚡ Latest 5 Updates</div>
+            <div id="micro-feed"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+window.CTWIN_USER_ID = USER_ID;
+
+let riskTrendInst;
+
+// Clock
+setInterval(() => {
+  document.getElementById('cc-clock').textContent = new Date().toLocaleString('en-IN', {
+    weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+  });
+}, 1000);
+
+async function loadAll() {
+  await Promise.all([
+    loadKPIs(),
+    loadActivities(),
+    loadAnomalies(),
+    loadAlerts(),
+    loadMicroFeed(),
+    loadRiskTrend(),
+  ]);
+}
+
+async function loadKPIs() {
+  try {
+    const [health, twin, updates] = await Promise.all([
+      fetch('/api/site-health').then(r=>r.json()),
+      fetch('/digital-twin').then(r=>r.json()),
+      fetch('/api/updates?limit=500').then(r=>r.json()),
+    ]);
+
+    const score = health.health_score;
+    const col   = score>=80?'var(--green)':score>=60?'var(--orange)':'var(--red)';
+    document.getElementById('kpi-health').textContent = `${score}`;
+    document.getElementById('kpi-health').style.color = col;
+
+    const hr = twin.filter(t=>t.status==='HIGH RISK').length;
+    document.getElementById('kpi-risk').textContent   = hr;
+    document.getElementById('kpi-updates').textContent = updates.length;
+
+    // Ticker tape
+    buildTicker(twin, updates, health);
+  } catch(e) {}
+}
+
+function buildTicker(twin, updates, health) {
+  const items = [
+    `🏥 Site Health: ${health.health_score} (${health.grade})`,
+    ...twin.map(t=>`${t.status==='HIGH RISK'?'🚨':t.status==='MEDIUM RISK'?'⚡':'✅'} ${t.activity}: ${t.progress_pct||0}% complete — Risk ${t.risk_score}`),
+    `📊 Total field updates: ${updates.length}`,
+    `👷 Last update: ${updates[0]?`${updates[0].worker_name} — ${updates[0].work_type} — ${updates[0].quantity_done}${updates[0].quantity_unit}` : 'None'}`,
+    `🕐 Last refresh: ${new Date().toLocaleTimeString('en-IN')}`,
+  ];
+  document.getElementById('ticker').innerHTML = [...items, ...items].map(i=>
+    `<div class="ticker-item">${i}</div>`
+  ).join('');
+}
+
+async function loadActivities() {
+  const data = await fetch('/digital-twin').then(r=>r.json());
+  const cont = document.getElementById('live-activities');
+  if (!data.length) { cont.innerHTML='<p style="color:var(--text3);">No activities.</p>'; return; }
+  cont.innerHTML = data.map(d=>{
+    const pct = Math.min(d.progress_pct||0, 100);
+    return `<div class="live-act" style="--la-color:${d.color};margin-bottom:9px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+        <div>
+          <div style="font-size:12px;font-weight:700;">${d.activity}</div>
+          <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);">${d.activity_type}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:${d.color};line-height:1;">${d.risk_score}</div>
+          <div style="font-family:var(--font-m);font-size:8px;color:var(--text3);">RISK</div>
+        </div>
+      </div>
+      <div class="pbar"><div class="pbar-fill" style="width:${pct}%;background:${d.color};"></div></div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--font-m);font-size:10px;color:var(--text3);margin-top:5px;">
+        <span>${pct}% complete</span>
+        <span>Util ${d.utilization}% · Down ${d.downtime_events}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadAnomalies() {
+  const updates = await fetch('/api/updates?limit=200').then(r=>r.json());
+  if (!updates.length) {
+    document.getElementById('anomalies').innerHTML = '<p style="color:var(--text3);font-size:12px;">No data to analyze.</p>';
+    return;
+  }
+
+  // Statistical anomaly detection
+  const qtys  = updates.map(u=>u.quantity_done).filter(q=>q>0);
+  const hours = updates.map(u=>u.hours_worked).filter(h=>h>0);
+
+  const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+  const std  = arr => { const m=mean(arr); return Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length); };
+
+  const qMean=mean(qtys); const qStd=std(qtys);
+  const hMean=mean(hours); const hStd=std(hours);
+
+  const anomalies = [];
+
+  updates.slice(0,50).forEach(u => {
+    const qZ = qStd>0 ? Math.abs(u.quantity_done - qMean) / qStd : 0;
+    const hZ = hStd>0 ? Math.abs(u.hours_worked  - hMean) / hStd : 0;
+
+    if (qZ > 2.5) {
+      anomalies.push({
+        type: u.quantity_done > qMean ? 'UNUSUALLY HIGH QTY' : 'UNUSUALLY LOW QTY',
+        msg:  `${u.worker_name}: ${u.quantity_done}${u.quantity_unit} (avg ${qMean.toFixed(1)}, z=${qZ.toFixed(1)}σ)`,
+        severity: qZ > 3 ? 'high' : 'medium',
+        icon: u.quantity_done > qMean ? '📈' : '📉',
+      });
+    }
+    if (u.hours_worked < 2 && u.hours_worked > 0) {
+      anomalies.push({
+        type: 'VERY LOW HOURS',
+        msg:  `${u.worker_name}: only ${u.hours_worked}h logged on ${u.work_type}`,
+        severity: 'medium', icon: '⏱️',
+      });
+    }
+    if (u.crew_size > 0 && u.hours_worked > 0) {
+      const qph = u.quantity_done / (u.crew_size * u.hours_worked);
+      const avgQph = qMean / (10 * hMean);
+      if (qph > avgQph * 5 && qph > 0.1) {
+        anomalies.push({
+          type: 'SUSPICIOUSLY HIGH EFFICIENCY',
+          msg:  `${u.worker_name}: ${u.quantity_done}${u.quantity_unit} / ${u.crew_size}p / ${u.hours_worked}h — verify data`,
+          severity: 'low', icon: '🤔',
+        });
+      }
+    }
+  });
+
+  const cont = document.getElementById('anomalies');
+  if (!anomalies.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:20px;font-size:12px;color:var(--green);">✅ No statistical anomalies detected</div>';
+    return;
+  }
+
+  const colors = {high:['rgba(239,68,68,.12)','#EF4444'], medium:['rgba(245,158,11,.1)','#F59E0B'], low:['rgba(59,130,246,.08)','#3B82F6']};
+  cont.innerHTML = anomalies.slice(0,6).map(a=>`
+    <div class="anomaly-item" style="--a-color:${colors[a.severity][1]};--a-bg:${colors[a.severity][0]};">
+      <div class="anomaly-icon">${a.icon}</div>
+      <div>
+        <div style="font-family:var(--font-m);font-size:10px;font-weight:700;color:${colors[a.severity][1]};margin-bottom:3px;">${a.type}</div>
+        <div style="font-size:11px;color:var(--text2);">${a.msg}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function loadAlerts() {
+  const alerts = await fetch('/api/alerts?unread_only=true').then(r=>r.json());
+  const cont = document.getElementById('cc-alerts');
+  if (!alerts.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:16px;font-size:12px;color:var(--green);">✅ No active alerts</div>';
+    return;
+  }
+  const sevColors = {high:'var(--red)',medium:'var(--orange)',low:'var(--accent2)'};
+  const icons = {HIGH_RISK:'🚨',EQUIPMENT:'⚙️',DELAY:'⏱️',WEATHER:'🌧️',SAFETY:'⛑️'};
+  cont.innerHTML = alerts.slice(0,5).map(a=>`
+    <div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.03);">
+      <span style="font-size:16px;">${icons[a.alert_type]||'⚠️'}</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:${sevColors[a.severity]};">${a.alert_type.replace('_',' ')}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px;">${a.message.substr(0,70)}${a.message.length>70?'…':''}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function loadMicroFeed() {
+  const updates = await fetch('/api/updates?limit=5').then(r=>r.json());
+  const cont = document.getElementById('micro-feed');
+  if (!updates.length) { cont.innerHTML='<p style="color:var(--text3);font-size:12px;">No updates yet.</p>'; return; }
+  cont.innerHTML = updates.map(u=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);">
+      <div class="avatar" style="background:var(--accent);width:26px;height:26px;font-size:10px;color:#000;">${u.worker_name[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.worker_name} — ${u.work_type}</div>
+        <div style="font-family:var(--font-m);font-size:10px;color:var(--text3);">${u.quantity_done}${u.quantity_unit} · ${u.hours_worked}h · ${u.issue_type.toLowerCase()!=='none'?'⚠️ '+u.issue_type:'✅ Clear'}</div>
+      </div>
+      <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);flex-shrink:0;">${new Date(u.timestamp).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+    </div>`).join('');
+}
+
+async function loadRiskTrend() {
+  var data = await fetch('/api/risk-history').then(function(r){ return r.json(); });
+  if (!data.length) return;
+
+  var labels = ['6d ago','5d ago','4d ago','3d ago','2d ago','Yesterday','Today'];
+
+  // Build chart datasets from real DB values
+  var datasets = data.slice(0, 4).map(function(d) {
+    return {
+      label:           d.activity.length > 16 ? d.activity.substr(0,14)+'…' : d.activity,
+      data:            d.scores,
+      borderColor:     d.trend_color,
+      backgroundColor: d.trend_color + '15',
+      tension:         0.4,
+      pointRadius:     3,
+      pointBackgroundColor: d.trend_color,
+      borderWidth:     2,
+      fill:            false,
+    };
+  });
+
+  if (riskTrendInst) riskTrendInst.destroy();
+  riskTrendInst = new Chart(
+    document.getElementById('riskTrendChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color:'#71717A', font:{size:10} } },
+        tooltip: {
+          callbacks: {
+            afterLabel: function(ctx) {
+              var d = data[ctx.datasetIndex];
+              return 'Velocity: ' + (d.velocity > 0 ? '+' : '') + d.velocity + ' · ' + d.trend;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks:{color:'#71717A',font:{size:9}}, grid:{color:'rgba(255,255,255,.03)'} },
+        y: { min:0, max:100,
+             ticks:{color:'#71717A',font:{size:9}},
+             grid:{color:'rgba(255,255,255,.03)'},
+        }
+      }
+    }
+  });
+
+  // Show velocity cards below the chart
+  renderVelocityCards(data);
+}
+
+function renderVelocityCards(data) {
+  // Create velocity summary cards if container exists
+  var existing = document.getElementById('velocity-cards');
+  if (!existing) {
+    var container = document.createElement('div');
+    container.id = 'velocity-cards';
+    container.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:14px;';
+    document.getElementById('riskTrendChart').parentElement.appendChild(container);
+  }
+
+  document.getElementById('velocity-cards').innerHTML = data.map(function(d) {
+    var arrow = d.velocity > 3 ? '↑' : d.velocity < -3 ? '↓' : '→';
+    var velDisplay = (d.velocity > 0 ? '+' : '') + d.velocity;
+    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;border-left:3px solid ' + d.trend_color + ';">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;">' + d.activity + '</div>' +
+        '<span style="font-family:var(--font-m);font-size:16px;font-weight:800;color:' + d.trend_color + ';">' + arrow + ' ' + velDisplay + '</span>' +
+      '</div>' +
+      '<div style="font-family:var(--font-m);font-size:9px;color:' + d.trend_color + ';text-transform:uppercase;letter-spacing:.8px;margin-top:4px;">' + d.trend + '</div>' +
+      '<div style="font-family:var(--font-m);font-size:10px;color:var(--text3);margin-top:2px;">Current risk: <b style="color:var(--text);">' + d.current_risk + '</b></div>' +
+    '</div>';
+  }).join('');
+}
+
+async function generateReport() {
+  const btn = document.getElementById('report-btn');
+  btn.textContent = '⏳ Generating…';
+  btn.disabled = true;
+  document.getElementById('report-panel').style.display = 'block';
+  document.getElementById('report-text').textContent = 'SiteAI is analyzing all project data and composing your weekly report…';
+
+  try {
+    const [twin, forecasts, health, updates, alerts] = await Promise.all([
+      fetch('/digital-twin').then(r=>r.json()),
+      fetch('/api/delay-forecast').then(r=>r.json()),
+      fetch('/api/site-health').then(r=>r.json()),
+      fetch('/api/updates?limit=200').then(r=>r.json()),
+      fetch('/api/alerts').then(r=>r.json()),
+    ]);
+
+    // Build context for report
+    const context = {
+      date: new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+      health_score: health.health_score,
+      grade: health.grade,
+      activities: twin.map(t=>({
+        name: t.activity,
+        progress: t.progress_pct,
+        risk: t.risk_score,
+        status: t.status,
+        utilization: t.utilization,
+        downtime: t.downtime_events,
+      })),
+      high_risk: twin.filter(t=>t.status==='HIGH RISK').map(t=>t.activity),
+      delays:    forecasts.filter(f=>f.delay_days>0).map(f=>`${f.name}: +${f.delay_days} days`),
+      total_updates: updates.length,
+      recent_issues: updates.slice(0,20).filter(u=>u.issue_type.toLowerCase()!=='none').map(u=>`${u.worker_name}: ${u.issue_type}`),
+      unread_alerts: alerts.filter(a=>!a.is_read).length,
+    };
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        message: `Generate a formal weekly site status report for the project manager using this data: ${JSON.stringify(context)}
+
+Format the report with these sections:
+1. EXECUTIVE SUMMARY (2-3 sentences)
+2. SITE HEALTH: ${context.health_score}/100 — Grade ${context.grade}
+3. ACTIVITY STATUS TABLE (list each activity with progress, risk, key notes)
+4. RISKS & DELAYS (highlight high-risk and delayed activities)
+5. ISSUES LOGGED THIS WEEK (summarize key issues)
+6. RECOMMENDATIONS (3-5 specific actionable items)
+7. NEXT WEEK TARGETS
+
+Write in a formal, professional tone. Date: ${context.date}`,
+        user_id: USER_ID,
+        session_id: 'report_' + Date.now(),
+        history: [],
+      }),
+    });
+    const data = await res.json();
+    document.getElementById('report-text').textContent = data.reply;
+  } catch(e) {
+    document.getElementById('report-text').textContent = 'Report generation failed. Please ensure the API key is set.\n\nError: ' + e.message;
+  }
+
+  btn.textContent = '✦ Regenerate';
+  btn.disabled = false;
+}
+
+function copyReport() {
+  navigator.clipboard.writeText(document.getElementById('report-text').textContent);
+  event.target.textContent = '✅ Copied!';
+  setTimeout(() => event.target.textContent = '📋 Copy', 1500);
+}
+
+function downloadReport() {
+  const text = document.getElementById('report-text').textContent;
+  const blob = new Blob([text], {type:'text/plain'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `site-report-${new Date().toISOString().split('T')[0]}.txt`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+async function markAllRead() {
+  await fetch('/api/alerts/read-all', {method:'POST'});
+  loadAlerts();
+}
+
+loadAll();
+setInterval(loadAll, 15000);
+</script>
+<script src="/static/chatbot.js"></script>
+</body>
+</html>
