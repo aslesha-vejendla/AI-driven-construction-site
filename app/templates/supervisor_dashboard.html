@@ -1,4 +1,3 @@
-{% from "_sidebar.html" import sidebar %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,223 +5,97 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Supervisor Dashboard — ConstructTwin</title>
 <link rel="stylesheet" href="/static/style.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-.live-dot {
-  width:8px; height:8px; border-radius:50%;
-  background:var(--green); display:inline-block;
-  animation:blink 1.4s infinite; margin-right:5px;
-}
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
-
-.twin-status-bar {
-  display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;
-}
-.tsb-item {
-  flex:1; min-width:130px;
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius-lg); padding:14px 16px;
-  position:relative; overflow:hidden;
-}
-.tsb-item::before {
-  content:''; position:absolute; top:0; left:0; right:0; height:2px;
-  background:var(--tsb-color, var(--accent));
-}
-.tsb-val { font-family:var(--font-d); font-size:28px; font-weight:800; line-height:1; }
-.tsb-lbl { font-family:var(--font-m); font-size:9px; color:var(--text3); text-transform:uppercase; letter-spacing:1.5px; margin-top:5px; }
-
-.alert-item {
-  display:flex; align-items:flex-start; gap:12px;
-  padding:11px 0; border-bottom:1px solid rgba(255,255,255,.04);
-}
-.alert-item:last-child { border-bottom:none; }
-
-.worker-rank {
-  display:flex; align-items:center; gap:12px;
-  padding:10px 0; border-bottom:1px solid rgba(255,255,255,.04);
-}
-.worker-rank:last-child { border-bottom:none; }
-.rank-num {
-  font-family:var(--font-m); font-size:11px; color:var(--text3);
-  width:20px; text-align:center; flex-shrink:0;
-}
+.dashboard-shell{max-width:1200px;margin:0 auto;padding:28px 24px 48px;}
+.welcome-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+.welcome-title{font-size:2rem;font-weight:700;letter-spacing:.2px}
+.welcome-sub{font-size:1.05rem;color:var(--text2);margin-top:4px}
+.feature-strip{display:flex;gap:10px;overflow:auto;padding-bottom:8px;margin-bottom:24px;border-bottom:1px solid var(--border)}
+.feature-pill{padding:10px 16px;border:1px solid var(--border);border-radius:999px;background:var(--surface);font-weight:600;color:var(--text2);white-space:nowrap}
+.feature-pill:hover{border-color:var(--blue);color:var(--text);background:var(--blue-dim)}
+.simple-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
+.simple-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px}
+.simple-stat .label{font-size:.92rem;color:var(--text2)}
+.simple-stat .value{font-size:1.8rem;font-weight:700;line-height:1.2;margin-top:6px}
+.alert-item,.worker-rank{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.alert-item:last-child,.worker-rank:last-child{border-bottom:none}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px}
 </style>
 </head>
-<body data-uid="{{ user.id if user else 1 }}">
-
-<div class="app-layout">
-  {{ sidebar(user, 'dash', 'supervisor') }}
-
-  <div class="main">
-    <div class="topbar">
-      <div class="topbar-title">
-        <span class="live-dot"></span>Supervisor Dashboard
-      </div>
-      <div class="topbar-right">
-        <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);"></span>
-        <button class="btn btn-outline btn-sm" onclick="loadAll()">↺ Refresh</button>
-        <div style="position:relative;cursor:pointer;" onclick="toggleAlertPanel()">
-          <button class="btn btn-outline btn-sm" style="gap:5px;">
-            🔔 <span id="alert-badge"
-              style="background:var(--red);color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;font-family:var(--font-m);display:none;">0</span>
-          </button>
-        </div>
-      </div>
+<body data-uid="{{ user.id if user else 1 }}" data-uname="{{ user.name if user else 'Supervisor' }}">
+<div class="dashboard-shell">
+  <div class="welcome-head">
+    <div>
+      <div class="welcome-title">Welcome, {{ user.name if user else 'Supervisor' }}</div>
+      <div class="welcome-sub">Supervisor Command Dashboard</div>
     </div>
-
-    <div class="page">
-
-      <!-- Alert panel (hidden by default) -->
-      <div id="alert-panel" style="display:none;margin-bottom:18px;" class="card scale-in">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-          <div class="card-title">🔔 Active Alerts</div>
-          <button class="btn btn-outline btn-sm" onclick="markAllRead()">✓ Mark all read</button>
-        </div>
-        <div id="alerts-list"><div style="text-align:center;color:var(--text3);padding:16px;">Loading…</div></div>
-      </div>
-
-      <!-- KPI strip -->
-      <div class="twin-status-bar">
-        <div class="tsb-item fade-up">
-          <div class="tsb-val" id="k-proj">—</div>
-          <div class="tsb-lbl">Projects</div>
-        </div>
-        <div class="tsb-item fade-up" style="--tsb-color:var(--accent2)">
-          <div class="tsb-val" id="k-act">—</div>
-          <div class="tsb-lbl">Activities</div>
-        </div>
-        <div class="tsb-item fade-up" style="--tsb-color:var(--green)">
-          <div class="tsb-val" id="k-upd">—</div>
-          <div class="tsb-lbl">Field Updates</div>
-        </div>
-        <div class="tsb-item fade-up" style="--tsb-color:var(--red)">
-          <div class="tsb-val" id="k-risk" style="color:var(--red)">—</div>
-          <div class="tsb-lbl">High Risk</div>
-        </div>
-        <div class="tsb-item fade-up" style="--tsb-color:var(--orange)">
-          <div class="tsb-val" id="k-down" style="color:var(--orange)">—</div>
-          <div class="tsb-lbl">Downtime Events</div>
-        </div>
-        <div class="tsb-item fade-up" style="--tsb-color:var(--purple)">
-          <div class="tsb-val" id="k-health">—</div>
-          <div class="tsb-lbl">Site Health</div>
-        </div>
-      </div>
-
-      <!-- Charts -->
-      <div class="g2">
-        <div class="card fade-up">
-          <div class="card-title">🔴 Risk Score by Activity</div>
-          <div class="card-sub">Higher = more critical — threshold at 65</div>
-          <canvas id="riskChart" style="max-height:240px;"></canvas>
-        </div>
-        <div class="card fade-up">
-          <div class="card-title">⚡ Utilization vs Progress</div>
-          <div class="card-sub">% of planned 24h cycle vs % complete</div>
-          <canvas id="utilChart" style="max-height:240px;"></canvas>
-        </div>
-      </div>
-
-      <!-- Digital Twin table -->
-      <div class="card mt5 fade-up">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-          <div>
-            <div class="card-title">🛰 Digital Twin — Live Status</div>
-            <div class="card-sub">Real-time composite view of all monitored activities</div>
-          </div>
-          <a id="link-command" href="#" class="btn btn-outline btn-sm">→ Command Center</a>
-        </div>
-        <div style="overflow-x:auto;">
-          <div id="twin-table">
-            <div style="text-align:center;color:var(--text3);padding:28px;">Loading…</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Two-column: workers + progress -->
-      <div class="g2 mt5">
-
-        <!-- Worker leaderboard -->
-        <div class="card fade-up">
-          <div class="card-title">🏆 Worker Leaderboard</div>
-          <div class="card-sub">Ranked by total quantity submitted</div>
-          <div id="worker-list"></div>
-        </div>
-
-        <!-- Progress bars -->
-        <div class="card fade-up">
-          <div class="card-title">📈 Activity Progress</div>
-          <div class="card-sub">Planned vs actual completion percentage</div>
-          <div id="prog-bars"></div>
-        </div>
-
-      </div>
-
-      <!-- Navigation cards for supervisor features -->
-      <div class="mt5 fade-up">
-        <div class="section-divider">Supervisor Tools</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:14px;">
-          <a id="link-command2" href="#" class="card" style="text-decoration:none;text-align:center;padding:22px 16px;transition:all .2s;">
-            <div style="font-size:28px;margin-bottom:8px;">🖥️</div>
-            <div style="font-family:var(--font-d);font-size:13px;font-weight:700;">Command Center</div>
-            <div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--font-m);">Live war room · AI reports</div>
-          </a>
-          <a id="link-analytics" href="#" class="card" style="text-decoration:none;text-align:center;padding:22px 16px;transition:all .2s;">
-            <div style="font-size:28px;margin-bottom:8px;">📊</div>
-            <div style="font-family:var(--font-d);font-size:13px;font-weight:700;">Analytics</div>
-            <div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--font-m);">EVM · Heatmap · Delay forecast</div>
-          </a>
-          <a id="link-gantt" href="#" class="card" style="text-decoration:none;text-align:center;padding:22px 16px;transition:all .2s;">
-            <div style="font-size:28px;margin-bottom:8px;">📅</div>
-            <div style="font-family:var(--font-d);font-size:13px;font-weight:700;">Gantt Chart</div>
-            <div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--font-m);">Timeline · AI forecast bars</div>
-          </a>
-          <a id="link-twin" href="#" class="card" style="text-decoration:none;text-align:center;padding:22px 16px;transition:all .2s;">
-            <div style="font-size:28px;margin-bottom:8px;">🛰</div>
-            <div style="font-family:var(--font-d);font-size:13px;font-weight:700;">Digital Twin</div>
-            <div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--font-m);">Risk engine · Insights</div>
-          </a>
-          <a id="link-handover" href="#" class="card" style="text-decoration:none;text-align:center;padding:22px 16px;transition:all .2s;">
-            <div style="font-size:28px;margin-bottom:8px;">🔄</div>
-            <div style="font-family:var(--font-d);font-size:13px;font-weight:700;">Shift Handover</div>
-            <div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--font-m);">AI briefings · History</div>
-          </a>
-        </div>
-      </div>
-
+    <div>
+      <span id="clock" style="font-size:.95rem;color:var(--text2);"></span>
+      <button class="btn btn-outline btn-sm" onclick="loadAll()">↻ Refresh</button>
     </div>
+  </div>
+
+  <div class="feature-strip">
+    <a id="link-dashboard" class="feature-pill" href="#">Dashboard</a>
+    <a id="link-evm" class="feature-pill" href="#">EVM Analytics</a>
+    <a id="link-gantt" class="feature-pill" href="#">Gantt</a>
+    <a id="link-monitor" class="feature-pill" href="#">Site Monitor</a>
+    <a id="link-twin" class="feature-pill" href="#">Digital Twin</a>
+    <a id="link-handover" class="feature-pill" href="#">Shift Handover</a>
+    <a id="link-profile" class="feature-pill" href="#">Profile</a>
+    <a class="feature-pill" href="/logout">Logout</a>
+  </div>
+
+  <div class="simple-grid">
+    <div class="simple-stat"><div class="label">Projects</div><div class="value" id="k-proj">—</div></div>
+    <div class="simple-stat"><div class="label">Activities</div><div class="value" id="k-act">—</div></div>
+    <div class="simple-stat"><div class="label">Field Updates</div><div class="value" id="k-upd">—</div></div>
+    <div class="simple-stat"><div class="label">High Risk</div><div class="value" id="k-risk">—</div></div>
+    <div class="simple-stat"><div class="label">Downtime Events</div><div class="value" id="k-down">—</div></div>
+    <div class="simple-stat"><div class="label">Site Health</div><div class="value" id="k-health">—</div></div>
+  </div>
+
+  <div class="g2">
+    <div class="panel">
+      <div class="card-title">Active Alerts</div>
+      <div id="alerts-list"><p style="color:var(--text3)">Loading…</p></div>
+    </div>
+    <div class="panel">
+      <div class="card-title">Worker Activity</div>
+      <div id="worker-list"><p style="color:var(--text3)">Loading…</p></div>
+    </div>
+  </div>
+
+  <div class="panel mt5">
+    <div class="card-title">Digital Twin Live Status</div>
+    <div class="card-sub">Minimal, actionable view for daily decisions.</div>
+    <div id="twin-table"><p style="color:var(--text3)">Loading…</p></div>
+  </div>
+
+  <div class="panel mt5">
+    <div class="card-title">Progress by Activity</div>
+    <div id="prog-bars"><p style="color:var(--text3)">Loading…</p></div>
   </div>
 </div>
 
 <script>
 var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
-window.CTWIN_USER_ID = USER_ID;
+[
+  ['link-dashboard','/supervisor-dashboard?user_id='],
+  ['link-evm','/analytics?user_id='],
+  ['link-gantt','/gantt?user_id='],
+  ['link-monitor','/monitor?user_id='],
+  ['link-twin','/digital-twin-page?user_id='],
+  ['link-handover','/handover?user_id='],
+  ['link-profile','/profile?user_id=']
+].forEach(function(item){ var el=document.getElementById(item[0]); if(el) el.href=item[1]+USER_ID; });
 
-/* Fix all links */
-['link-command','link-command2','link-analytics','link-gantt','link-twin','link-handover'].forEach(function(id) {
-  var el = document.getElementById(id);
-  if (!el) return;
-  var map = {
-    'link-command':  '/command-center?user_id=',
-    'link-command2': '/command-center?user_id=',
-    'link-analytics':'/analytics?user_id=',
-    'link-gantt':    '/gantt?user_id=',
-    'link-twin':     '/digital-twin-page?user_id=',
-    'link-handover': '/handover?user_id=',
-  };
-  el.href = (map[id] || '#') + USER_ID;
-});
-
-/* Clock */
 setInterval(function() {
-  document.getElementById('clock').textContent =
-    new Date().toLocaleTimeString('en-IN',{hour12:false}) + ' IST';
+  document.getElementById('clock').textContent = new Date().toLocaleString();
 }, 1000);
 
-var riskInst, utilInst;
-
 async function loadAll() {
-  await Promise.all([loadKPIs(), loadTwin(), loadWorkers(), loadProgress(), loadAlertCount()]);
+  await Promise.all([loadKPIs(), loadTwin(), loadWorkers(), loadProgress(), loadAlerts()]);
 }
 
 async function loadKPIs() {
@@ -232,14 +105,14 @@ async function loadKPIs() {
       fetch('/api/activities').then(function(r){ return r.json(); }),
       fetch('/api/updates?limit=500').then(function(r){ return r.json(); }),
       fetch('/digital-twin').then(function(r){ return r.json(); }),
-      fetch('/api/site-health').then(function(r){ return r.json(); }).catch(function(){ return {health_score:'—'}; }),
+      fetch('/api/site-health').then(function(r){ return r.json(); }).catch(function(){ return {health_score:'—'}; })
     ]);
     var projects=results[0], activities=results[1], updates=results[2], twin=results[3], health=results[4];
-    document.getElementById('k-proj').textContent   = projects.length;
-    document.getElementById('k-act').textContent    = activities.length;
-    document.getElementById('k-upd').textContent    = updates.length;
-    document.getElementById('k-risk').textContent   = twin.filter(function(t){ return t.status==='HIGH RISK'; }).length;
-    document.getElementById('k-down').textContent   = twin.reduce(function(s,t){ return s+t.downtime_events; }, 0);
+    document.getElementById('k-proj').textContent = projects.length;
+    document.getElementById('k-act').textContent = activities.length;
+    document.getElementById('k-upd').textContent = updates.length;
+    document.getElementById('k-risk').textContent = twin.filter(function(t){ return t.status==='HIGH RISK'; }).length;
+    document.getElementById('k-down').textContent = twin.reduce(function(s,t){ return s+t.downtime_events; }, 0);
     document.getElementById('k-health').textContent = health.health_score || '—';
   } catch(e) {}
 }
@@ -247,182 +120,52 @@ async function loadKPIs() {
 async function loadTwin() {
   var data = await fetch('/digital-twin').then(function(r){ return r.json(); });
   var cont = document.getElementById('twin-table');
-  if (!data.length) {
-    cont.innerHTML = '<p style="color:var(--text3);padding:20px;">No activities found. Run seed.py first.</p>';
-    return;
-  }
-  cont.innerHTML =
-    '<table class="tbl"><thead><tr>' +
-    '<th>Activity</th><th>Status</th><th>Risk</th><th>Progress</th>' +
-    '<th>Utilization</th><th>Downtime</th><th>Crew</th><th>Insight</th>' +
-    '</tr></thead><tbody>' +
-    data.map(function(d) {
-      var bc  = d.status==='ON TRACK' ? 'badge-green' : d.status==='MEDIUM RISK' ? 'badge-yellow' : d.status==='HIGH RISK' ? 'badge-red' : 'badge-gray';
-      var pct = Math.min(d.progress_pct || 0, 100);
-      return '<tr>' +
-        '<td><strong style="font-size:12px;">' + d.activity + '</strong><br>' +
-          '<span style="font-size:10px;color:var(--text3);">' + d.activity_type + '</span></td>' +
-        '<td><span class="badge ' + bc + '">' + d.status + '</span></td>' +
-        '<td><div style="display:flex;align-items:center;gap:8px;">' +
-          '<div class="pbar" style="width:55px;"><div class="pbar-fill" style="width:' + d.risk_score + '%;background:' + d.color + ';"></div></div>' +
-          '<span style="font-family:var(--font-m);font-size:12px;color:' + d.color + ';">' + d.risk_score + '</span>' +
-        '</div></td>' +
-        '<td><div class="pbar"><div class="pbar-fill" style="width:' + pct + '%;background:var(--accent2);"></div></div>' +
-          '<span style="font-family:var(--font-m);font-size:11px;color:var(--text3);">' + d.progress_pct + '%</span></td>' +
-        '<td style="font-family:var(--font-m);font-size:12px;">' + d.utilization + '%</td>' +
-        '<td style="font-family:var(--font-m);font-size:12px;color:' + (d.downtime_events>0?'var(--orange)':'var(--green)') + ';">' + d.downtime_events + '</td>' +
-        '<td style="font-family:var(--font-m);font-size:12px;">' + d.avg_crew + '</td>' +
-        '<td style="font-size:11px;color:var(--text3);max-width:180px;">' + d.insight + '</td>' +
-      '</tr>';
+  if (!data.length) { cont.innerHTML = '<p style="color:var(--text3);padding:12px;">No activities found.</p>'; return; }
+  cont.innerHTML = '<table class="tbl"><thead><tr><th>Activity</th><th>Status</th><th>Risk</th><th>Progress</th><th>Crew</th></tr></thead><tbody>' +
+    data.map(function(d){
+      var bc = d.status==='ON TRACK' ? 'badge-green' : d.status==='MEDIUM RISK' ? 'badge-yellow' : 'badge-red';
+      return '<tr><td>'+d.activity+'</td><td><span class="badge '+bc+'">'+d.status+'</span></td><td>'+d.risk_score+'</td><td>'+d.progress_pct+'%</td><td>'+d.avg_crew+'</td></tr>';
     }).join('') + '</tbody></table>';
-
-  /* Charts */
-  var labels = data.map(function(d){ return d.activity.length>14?d.activity.substr(0,12)+'…':d.activity; });
-  if (riskInst) riskInst.destroy();
-  riskInst = new Chart(document.getElementById('riskChart').getContext('2d'), {
-    type:'bar',
-    data:{ labels:labels, datasets:[{
-      label:'Risk Score',
-      data: data.map(function(d){ return d.risk_score; }),
-      backgroundColor: data.map(function(d){ return d.color+'66'; }),
-      borderColor:     data.map(function(d){ return d.color; }),
-      borderWidth:2, borderRadius:6
-    }]},
-    options:{ responsive:true, plugins:{legend:{display:false}},
-      scales:{
-        x:{ticks:{color:'#71717A',font:{size:10}},grid:{color:'rgba(255,255,255,.03)'}},
-        y:{min:0,max:100,ticks:{color:'#71717A'},grid:{color:'rgba(255,255,255,.03)'}},
-      }
-    }
-  });
-
-  if (utilInst) utilInst.destroy();
-  utilInst = new Chart(document.getElementById('utilChart').getContext('2d'), {
-    type:'bar',
-    data:{ labels:labels, datasets:[
-      { label:'Utilization %', data:data.map(function(d){ return d.utilization; }),
-        backgroundColor:'rgba(59,130,246,.5)', borderColor:'#3B82F6', borderWidth:2, borderRadius:4 },
-      { label:'Progress %',    data:data.map(function(d){ return d.progress_pct; }),
-        backgroundColor:'rgba(16,185,129,.5)', borderColor:'#10B981', borderWidth:2, borderRadius:4 },
-    ]},
-    options:{ responsive:true,
-      plugins:{ legend:{ labels:{color:'#A1A1AA',font:{size:11}} } },
-      scales:{
-        x:{ticks:{color:'#71717A',font:{size:10}},grid:{color:'rgba(255,255,255,.03)'}},
-        y:{min:0,max:100,ticks:{color:'#71717A'},grid:{color:'rgba(255,255,255,.03)'}},
-      }
-    }
-  });
 }
 
 async function loadWorkers() {
   var updates = await fetch('/api/updates?limit=500').then(function(r){ return r.json(); });
   var bw = {};
-  updates.forEach(function(u) {
-    if (!bw[u.worker_name]) bw[u.worker_name] = {count:0,qty:0,hours:0,issues:0};
-    bw[u.worker_name].count++;
-    bw[u.worker_name].qty   += u.quantity_done;
+  updates.forEach(function(u){
+    if (!bw[u.worker_name]) bw[u.worker_name] = {qty:0,hours:0};
+    bw[u.worker_name].qty += u.quantity_done;
     bw[u.worker_name].hours += u.hours_worked;
-    if (u.issue_type && u.issue_type.toLowerCase() !== 'none') bw[u.worker_name].issues++;
   });
   var sorted = Object.entries(bw).sort(function(a,b){ return b[1].qty - a[1].qty; });
-  var colors = ['#F59E0B','#3B82F6','#10B981','#8B5CF6','#EF4444','#06B6D4'];
-  var cont   = document.getElementById('worker-list');
-
-  if (!sorted.length) {
-    cont.innerHTML = '<p style="color:var(--text3);padding:16px;font-size:13px;">No worker data yet.</p>';
-    return;
-  }
-
+  var cont = document.getElementById('worker-list');
+  if (!sorted.length) { cont.innerHTML = '<p style="color:var(--text3)">No worker data yet.</p>'; return; }
   cont.innerHTML = sorted.slice(0,8).map(function(entry, i) {
     var name = entry[0], s = entry[1];
-    var eff  = s.hours > 0 ? (s.qty / s.hours).toFixed(1) : 0;
-    var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
-    return '<div class="worker-rank">' +
-      '<div class="rank-num">' + (medal || (i+1)) + '</div>' +
-      '<div class="avatar" style="background:' + colors[i % colors.length] + ';width:28px;height:28px;font-size:11px;border-radius:7px;">' + name[0].toUpperCase() + '</div>' +
-      '<div style="flex:1;min-width:0;">' +
-        '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + name + '</div>' +
-        '<div style="font-family:var(--font-m);font-size:10px;color:var(--text3);">' + s.count + ' updates · ' + s.qty.toFixed(1) + ' qty · ' + s.hours.toFixed(0) + 'h</div>' +
-      '</div>' +
-      '<div style="text-align:right;">' +
-        '<div style="font-family:var(--font-m);font-size:12px;color:var(--accent);">' + eff + ' qty/h</div>' +
-        (s.issues > 0 ?
-          '<span class="badge badge-red" style="font-size:9px;">⚠ ' + s.issues + '</span>' :
-          '<span class="badge badge-green" style="font-size:9px;">✓ clean</span>') +
-      '</div>' +
-    '</div>';
+    return '<div class="worker-rank"><span>' + (i+1) + '. ' + name + '</span><span style="color:var(--text2)">' + s.qty.toFixed(1) + ' qty</span></div>';
   }).join('');
 }
 
 async function loadProgress() {
   var data = await fetch('/api/progress-summary').then(function(r){ return r.json(); });
   var cont = document.getElementById('prog-bars');
-  if (!data.length) { cont.innerHTML = '<p style="color:var(--text3);padding:16px;">No activities.</p>'; return; }
-  cont.innerHTML = data.map(function(d) {
-    var pct = Math.min(d.progress_pct, 100);
-    var col = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
-    return '<div style="margin-bottom:16px;">' +
-      '<div style="display:flex;justify-content:space-between;margin-bottom:5px;">' +
-        '<span style="font-size:13px;font-weight:600;">' + d.activity_name + '</span>' +
-        '<span style="font-family:var(--font-m);font-size:11px;color:' + col + ';">' + d.progress_pct + '%</span>' +
-      '</div>' +
-      '<div class="pbar" style="height:7px;"><div class="pbar-fill" style="width:' + pct + '%;background:' + col + ';"></div></div>' +
-      '<div style="font-family:var(--font-m);font-size:10px;color:var(--text3);margin-top:4px;">' +
-        d.completed_quantity + ' ' + d.unit + ' of ' + d.planned_quantity + ' ' + d.unit +
-      '</div>' +
-    '</div>';
+  if (!data.length) { cont.innerHTML = '<p style="color:var(--text3);">No activities.</p>'; return; }
+  cont.innerHTML = data.map(function(d){
+    var pct = Math.min(d.progress_pct,100);
+    return '<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;"><span>'+d.activity_name+'</span><span>'+d.progress_pct+'%</span></div><div class="pbar"><div class="pbar-fill" style="width:'+pct+'%;"></div></div></div>';
   }).join('');
-}
-
-async function loadAlertCount() {
-  try {
-    var alerts = await fetch('/api/alerts?unread_only=true').then(function(r){ return r.json(); });
-    var badge  = document.getElementById('alert-badge');
-    if (alerts.length > 0) { badge.textContent = alerts.length; badge.style.display = 'inline'; }
-    else { badge.style.display = 'none'; }
-  } catch(e) {}
-}
-
-function toggleAlertPanel() {
-  var p = document.getElementById('alert-panel');
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
-  if (p.style.display === 'block') loadAlerts();
 }
 
 async function loadAlerts() {
   var alerts = await fetch('/api/alerts').then(function(r){ return r.json(); });
-  var cont   = document.getElementById('alerts-list');
-  if (!alerts.length) { cont.innerHTML = '<p style="color:var(--text3);padding:16px;">No alerts.</p>'; return; }
-  var sevCol = {high:'var(--red)', medium:'var(--orange)', low:'var(--accent2)'};
-  var icons  = {HIGH_RISK:'🚨', EQUIPMENT:'⚙️', DELAY:'⏱️', WEATHER:'🌧️', SAFETY:'⛑️'};
-  cont.innerHTML = alerts.map(function(a) {
-    return '<div class="alert-item" id="alr-' + a.id + '">' +
-      '<span style="font-size:18px;flex-shrink:0;">' + (icons[a.alert_type]||'⚠️') + '</span>' +
-      '<div style="flex:1;">' +
-        '<div style="font-size:12px;font-weight:600;color:' + (sevCol[a.severity]||'var(--text)') + ';">' + (a.alert_type||'').replace('_',' ') + '</div>' +
-        '<div style="font-size:12px;color:var(--text2);margin-top:2px;">' + a.message + '</div>' +
-        '<div style="font-size:10px;color:var(--text3);font-family:var(--font-m);margin-top:4px;">' + new Date(a.created_at).toLocaleString('en-IN') + '</div>' +
-      '</div>' +
-      (!a.is_read ?
-        '<button class="btn btn-outline btn-sm" onclick="markRead(' + a.id + ')">✓</button>' :
-        '<span style="font-size:11px;color:var(--text3);">read</span>') +
-    '</div>';
+  var cont = document.getElementById('alerts-list');
+  if (!alerts.length) { cont.innerHTML = '<p style="color:var(--text3)">No alerts.</p>'; return; }
+  cont.innerHTML = alerts.slice(0,8).map(function(a){
+    return '<div class="alert-item"><span>' + (a.alert_type || 'Alert') + '</span><span style="color:var(--text2)">' + a.severity + '</span></div>';
   }).join('');
-}
-
-async function markRead(id) {
-  await fetch('/api/alerts/' + id + '/read', {method:'POST'});
-  loadAlerts(); loadAlertCount();
-}
-async function markAllRead() {
-  await fetch('/api/alerts/read-all', {method:'POST'});
-  loadAlerts(); loadAlertCount();
 }
 
 loadAll();
 setInterval(loadAll, 30000);
 </script>
-<script src="/static/chatbot.js"></script>
 </body>
 </html>
