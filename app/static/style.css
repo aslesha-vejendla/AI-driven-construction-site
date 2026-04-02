@@ -4,47 +4,47 @@
    Fonts: Barlow Condensed (display) · Barlow (body) · IBM Plex Mono (data)
    Palette: Near-black · Concrete white · Amber accent · Status colours
 ═══════════════════════════════════════════════════════════════ */
-@import url('https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,300;1,700&family=Barlow+Condensed:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 /* ── Tokens ──────────────────────────────────────────────── */
 :root {
-  --bg:         #0E0F11;
-  --bg2:        #13151A;
-  --surface:    #1A1D24;
-  --surface2:   #21252E;
-  --surface3:   #282D38;
+  --bg:         #061533;
+  --bg2:        #0B2148;
+  --surface:    #102B5C;
+  --surface2:   #17376D;
+  --surface3:   #1D417C;
 
-  --border:     #2A2F3C;
-  --border2:    #353B4A;
+  --border:     #2D4C80;
+  --border2:    #3F639E;
 
-  --amber:      #E8A020;
-  --amber-dim:  rgba(232,160,32,.12);
-  --amber-glow: rgba(232,160,32,.06);
+  --amber:      #FFFFFF;
+  --amber-dim:  rgba(255,255,255,.14);
+  --amber-glow: rgba(255,255,255,.06);
 
-  --text:       #F2F4F8;
-  --text2:      #B8BFCC;
-  --text3:      #737D92;
-  --text4:      #444D60;
+  --text:       #FFFFFF;
+  --text2:      #D7E2FF;
+  --text3:      #A9BBE8;
+  --text4:      #7F94C7;
 
-  --green:      #3DD68C;
-  --green-dim:  rgba(61,214,140,.12);
-  --red:        #F25C5C;
-  --red-dim:    rgba(242,92,92,.12);
-  --blue:       #5B9CF6;
-  --blue-dim:   rgba(91,156,246,.12);
+  --green:      #6CE5B1;
+  --green-dim:  rgba(108,229,177,.15);
+  --red:        #FF8A8A;
+  --red-dim:    rgba(255,138,138,.15);
+  --blue:       #8AB4FF;
+  --blue-dim:   rgba(138,180,255,.15);
 
-  --font-d:     'Barlow Condensed', sans-serif;
-  --font-b:     'Barlow', sans-serif;
+  --font-d:     'Inter', sans-serif;
+  --font-b:     'Source Sans 3', sans-serif;
   --font-m:     'IBM Plex Mono', monospace;
 
-  --radius:     6px;
-  --radius-lg:  10px;
+  --radius:     8px;
+  --radius-lg:  12px;
   --sidebar-w:  220px;
 }
 
 /* ── Reset ───────────────────────────────────────────────── */
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-html { scroll-behavior:smooth; font-size:17px; }
+html { scroll-behavior:smooth; font-size:18px; }
 body {
   background:var(--bg);
   color:var(--text);

@@ -1,79 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>🏗️ ConstructionEase</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            height: 100vh;
-            background: linear-gradient(135deg, #2F5D62, #F9A826);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .card {
-            background: #ffffff;
-            width: 360px;
-            padding: 30px;
-            border-radius: 14px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-        }
-        h2 {
-            text-align: center;
-            color: #2F5D62;
-            margin-bottom: 5px;
-        }
-        p {
-            text-align: center;
-            color: #666;
-            margin-bottom: 20px;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 12px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            background: #2F5D62;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .link {
-            text-align: center;
-            margin-top: 12px;
-        }
-        a {
-            color: #F9A826;
-            font-weight: bold;
-            text-decoration: none;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ConstructionEase Login</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body{margin:0;min-height:100vh;background:linear-gradient(140deg,#061533,#0b2148);display:grid;place-items:center}
+    .split-login{width:min(1100px,94vw);height:min(620px,92vh);border:1px solid rgba(255,255,255,.16);border-radius:16px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;background:#0a1a3a;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+    .role-side{position:relative;padding:42px;display:flex;flex-direction:column;justify-content:center;transition:all .28s ease;border-right:1px solid rgba(255,255,255,.09)}
+    .role-side:last-child{border-right:none}
+    .role-side:hover{background:rgba(255,255,255,.06)}
+    .split-login:hover .role-side{opacity:.28;filter:grayscale(.2)}
+    .split-login .role-side:hover{opacity:1;filter:none;transform:scale(1.01)}
+    .role-title{font-size:2rem;font-weight:700;color:#fff}
+    .role-sub{margin-top:8px;color:#d7e2ff;font-size:1.05rem}
+    .login-form{margin-top:24px;display:grid;gap:12px}
+    .login-form input{width:100%;padding:14px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;font-size:1rem}
+    .login-form input::placeholder{color:#b9c8ea}
+    .btn-login{padding:13px 14px;border:none;border-radius:10px;background:#ffffff;color:#0b2148;font-size:1rem;font-weight:700;cursor:pointer}
+    .role-chip{display:inline-block;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.2);color:#d7e2ff;font-size:.9rem;margin-bottom:10px}
+    .register-link{margin-top:14px;color:#d7e2ff}
+    .register-link a{color:#fff;text-decoration:underline}
+    @media (max-width:900px){.split-login{grid-template-columns:1fr;height:auto}.role-side{border-right:none;border-bottom:1px solid rgba(255,255,255,.09)}}
+  </style>
 </head>
-
 <body>
-<div class="card">
-    <h2>🏗️ Site Login</h2>
-    <p>Monitor your construction with us</p>
-
-    <!-- FIELD NAMES FIXED -->
-    <form action="/login" method="post">
-        <input name="email" type="email" placeholder="Email" required>
+  <section class="split-login">
+    <div class="role-side">
+      <span class="role-chip">Supervisor Access</span>
+      <h2 class="role-title">Supervisor</h2>
+      <p class="role-sub">Track project KPIs, monitor EVM, and manage overall site performance.</p>
+      <form action="/login" method="post" class="login-form">
+        <input name="email" type="email" placeholder="Supervisor email" required>
         <input name="password" type="password" placeholder="Password" required>
-        <button type="submit">Login</button>
-    </form>
-
-    <div class="link">
-        New here? <a href="/register">Register 👷</a>
+        <button class="btn-login" type="submit">Login as Supervisor</button>
+      </form>
     </div>
-</div>
-<script src="/static/chatbot.js"></script>
+
+    <div class="role-side">
+      <span class="role-chip">Worker Access</span>
+      <h2 class="role-title">Worker</h2>
+      <p class="role-sub">Submit updates, report issues, and handle clean day-to-day field tracking.</p>
+      <form action="/login" method="post" class="login-form">
+        <input name="email" type="email" placeholder="Worker email" required>
+        <input name="password" type="password" placeholder="Password" required>
+        <button class="btn-login" type="submit">Login as Worker</button>
+      </form>
+      <div class="register-link">New user? <a href="/register">Register</a></div>
+    </div>
+  </section>
 </body>
 </html>
