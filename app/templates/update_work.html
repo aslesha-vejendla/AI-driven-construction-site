@@ -4,8 +4,211 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Submit Update — ConstructTwin</title>
+<title>Submit Update — Construction Ease</title>
 <link rel="stylesheet" href="/static/style.css">
+<style>
+/* ── Voice Assistant ─────────────────────────────────────── */
+.voice-panel {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.voice-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent2);
+}
+
+.mic-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--accent2);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0 4px 20px rgba(74,144,217,.4);
+}
+.mic-btn:hover { transform: scale(1.05); }
+.mic-btn.recording {
+  background: var(--red);
+  box-shadow: 0 4px 24px rgba(248,113,113,.5);
+  animation: mic-pulse 1.2s infinite;
+}
+.mic-btn.processing {
+  background: var(--orange);
+  box-shadow: 0 4px 24px rgba(251,191,36,.4);
+}
+@keyframes mic-pulse {
+  0%,100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+.mic-ring {
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  border: 2px solid var(--red);
+  opacity: 0;
+  animation: ring-expand 1.2s infinite;
+}
+.mic-ring:nth-child(2) { animation-delay: .4s; }
+.mic-ring:nth-child(3) { animation-delay: .8s; }
+@keyframes ring-expand {
+  0%   { transform: scale(1); opacity: .6; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.voice-transcript {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  font-family: var(--font-b);
+  font-size: 14px;
+  color: var(--text2);
+  min-height: 56px;
+  line-height: 1.6;
+  transition: border-color .2s;
+  flex: 1;
+}
+.voice-transcript.active {
+  border-color: var(--red);
+  color: var(--text);
+}
+.voice-transcript.has-text {
+  border-color: var(--accent2);
+  color: var(--text);
+}
+
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 32px;
+}
+.waveform-bar {
+  width: 4px;
+  background: var(--accent2);
+  border-radius: 2px;
+  transition: height .1s;
+}
+.mic-btn.recording ~ * .waveform-bar {
+  animation: wave 0.8s ease infinite;
+}
+@keyframes wave {
+  0%,100% { height: 6px; }
+  50%      { height: 28px; }
+}
+
+/* Field highlight when AI fills it */
+.form-input.ai-filled,
+.form-select.ai-filled,
+.form-textarea.ai-filled {
+  border-color: var(--accent2);
+  background: rgba(74,144,217,.06);
+  animation: field-flash .4s ease;
+}
+@keyframes field-flash {
+  0%   { background: rgba(74,144,217,.2); }
+  100% { background: rgba(74,144,217,.06); }
+}
+
+/* Extraction result chips */
+.extracted-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(74,144,217,.1);
+  border: 1px solid rgba(74,144,217,.25);
+  color: var(--accent2);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: var(--font-m);
+  margin: 3px;
+}
+
+/* Language toggle */
+.lang-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-family: var(--font-m);
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all .15s;
+}
+.lang-btn.selected {
+  background: var(--accent2);
+  color: #fff;
+  border-color: var(--accent2);
+}
+
+/* Status indicator */
+.voice-status {
+  font-family: var(--font-m);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Example phrases */
+.phrase-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .15s;
+  font-style: italic;
+}
+.phrase-card:hover {
+  border-color: var(--accent2);
+  color: var(--text);
+  background: rgba(74,144,217,.05);
+}
+.hamburger-btn {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  color: var(--navy-700);
+  cursor: pointer;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
+
+.hamburger-btn:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+</style>
 </head>
 <body data-uid="{{ user.id if user else 1 }}"
       data-uname="{{ user.name if user else 'Worker' }}"
@@ -16,178 +219,234 @@
 
   <div class="main">
     <div class="topbar">
-      <div class="topbar-title">📝 Submit Work Update</div>
+      <button id="sidebar-toggle" class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">☰</button>
+      <div class="topbar-title">Submit Work Update</div>
       <div class="topbar-right">
         <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);"></span>
+        <span id="shift-label" class="badge badge-blue" style="font-size:10px;"></span>
       </div>
     </div>
 
     <div class="page">
 
       {% if request.query_params.get('success') %}
-      <div class="alert-strip success">✅ Update submitted successfully!</div>
-      {% endif %}
-      {% if request.query_params.get('error') %}
-      <div class="alert-strip error">❌ {{ request.query_params.get('error') }}</div>
+      <div class="alert-strip success">Update submitted successfully.</div>
       {% endif %}
 
-      <div class="g2">
-
-        <!-- Form -->
-        <div class="card fade-up">
-          <div class="card-title">📋 Field Update Form</div>
-          <div class="card-sub">Submit your daily work progress</div>
-
-          <form method="POST" action="/worker-update" id="update-form">
-            <input type="hidden" name="user_id" id="f-uid" value="{{ user.id if user else 1 }}">
-
-            <div class="form-group">
-              <label class="form-label">Worker Name</label>
-              <input class="form-input" type="text" name="worker_name"
-                     value="{{ user.name if user else '' }}" required>
+      <!-- ── VOICE ASSISTANT PANEL ────────────────────────── -->
+      <div class="voice-panel fade-up">
+        <div class="flex-between" style="margin-bottom:16px;">
+          <div>
+            <div class="card-title" style="font-size:15px;">Voice Assistant</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:3px;font-family:var(--font-m);">
+              Speak your update — AI fills the form automatically
             </div>
+          </div>
+          <!-- Language selector -->
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span style="font-size:11px;color:var(--text3);font-family:var(--font-m);">Lang:</span>
+            <button class="lang-btn selected" id="lang-en" onclick="setLang('en-IN')">EN</button>
+            <button class="lang-btn" id="lang-hi" onclick="setLang('hi-IN')">HI</button>
+          </div>
+        </div>
 
-            <div class="form-group">
-              <label class="form-label">Activity</label>
-              <select class="form-select" name="activity_id" required>
-                <option value="">— Select Activity —</option>
-                {% for a in activities %}
-                <option value="{{ a.id }}">{{ a.name }} ({{ a.activity_type }})</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Work Type</label>
-              <select class="form-select" name="work_type" required>
-                <option value="">— Select —</option>
-                <option>TBM Advance</option>
-                <option>Excavation</option>
-                <option>Concrete Pouring</option>
-                <option>Rebar Fixing</option>
-                <option>Pile Boring</option>
-                <option>Shuttering</option>
-                <option>Survey</option>
-                <option>Inspection</option>
-                <option>Waterproofing</option>
-                <option>Backfilling</option>
-                <option>Other</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Work Description</label>
-              <textarea class="form-textarea" name="work_description"
-                        placeholder="Describe the work done today…" rows="3"></textarea>
-            </div>
-
-            <div class="g2" style="gap:12px;">
-              <div class="form-group">
-                <label class="form-label">Quantity Done</label>
-                <input class="form-input" type="number" name="quantity_done"
-                       step="0.01" min="0" placeholder="e.g. 12.5" required>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Unit</label>
-                <select class="form-select" name="quantity_unit">
-                  <option>m</option>
-                  <option>km</option>
-                  <option>m3</option>
-                  <option>MT</option>
-                  <option>no</option>
-                  <option>kg</option>
-                  <option>sqm</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="g2" style="gap:12px;">
-              <div class="form-group">
-                <label class="form-label">Hours Worked</label>
-                <input class="form-input" type="number" name="hours_worked"
-                       step="0.5" min="0" max="24" placeholder="e.g. 8" required>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Crew Size</label>
-                <input class="form-input" type="number" name="crew_size"
-                       min="1" max="100" placeholder="e.g. 10" value="5">
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Weather Condition</label>
-              <select class="form-select" name="weather_condition">
-                <option>Clear</option>
-                <option>Cloudy</option>
-                <option>Rain</option>
-                <option>Heavy Rain</option>
-                <option>Fog</option>
-                <option>Extreme Heat</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Issue Reported</label>
-              <select class="form-select" name="issue_type" id="issue-select">
-                <option value="None">None — No Issues</option>
-                <option value="Equipment Breakdown">Equipment Breakdown</option>
-                <option value="Material Delay">Material Delay</option>
-                <option value="Labour Shortage">Labour Shortage</option>
-                <option value="Safety Concern">Safety Concern</option>
-                <option value="Weather">Weather Delay</option>
-                <option value="Design Change">Design Change</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div class="form-group" id="safety-row">
-              <label class="form-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                <input type="checkbox" name="safety_ok" value="true" checked
-                       style="width:16px;height:16px;accent-color:var(--green);">
-                <span>Safety checks passed for today</span>
-              </label>
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;">
-              ✅ Submit Update
+        <!-- Main voice row -->
+        <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:16px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0;">
+            <button class="mic-btn" id="mic-btn" onclick="toggleRecording()" title="Tap to speak">
+              <div class="mic-ring" id="ring1"></div>
+              <div class="mic-ring" id="ring2"></div>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="mic-icon">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8"  y1="23" x2="16" y2="23"/>
+              </svg>
             </button>
-          </form>
-        </div>
-
-        <!-- Right panel -->
-        <div style="display:flex;flex-direction:column;gap:16px;">
-
-          <!-- Shift indicator -->
-          <div class="card fade-up">
-            <div class="card-title">⏰ Current Shift</div>
-            <div class="card-sub">Auto-detected from system time</div>
-            <div style="text-align:center;padding:16px 0;">
-              <div id="shift-badge" style="font-family:var(--font-d);font-size:22px;font-weight:800;"></div>
-              <div id="shift-time" style="font-family:var(--font-m);font-size:11px;color:var(--text3);margin-top:6px;"></div>
+            <div class="voice-status" id="voice-status">
+              <div class="status-dot" style="background:var(--text4);"></div>
+              <span style="color:var(--text4);">Ready</span>
             </div>
           </div>
 
-          <!-- My recent updates -->
-          <div class="card fade-up">
-            <div class="card-title">🕑 My Recent Submissions</div>
-            <div class="card-sub">Last 5 updates</div>
-            <div id="recent-updates">
-              <div style="color:var(--text3);font-size:13px;padding:8px 0;">Loading…</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+            <div class="voice-transcript" id="transcript-box">
+              Tap the microphone and describe your work...
+            </div>
+
+            <!-- Waveform (shown while recording) -->
+            <div id="waveform-row" style="display:none;">
+              <div class="waveform" id="waveform">
+                <div class="waveform-bar" style="height:6px;"></div>
+                <div class="waveform-bar" style="height:10px;animation-delay:.1s"></div>
+                <div class="waveform-bar" style="height:16px;animation-delay:.2s"></div>
+                <div class="waveform-bar" style="height:22px;animation-delay:.3s"></div>
+                <div class="waveform-bar" style="height:28px;animation-delay:.4s"></div>
+                <div class="waveform-bar" style="height:22px;animation-delay:.5s"></div>
+                <div class="waveform-bar" style="height:16px;animation-delay:.6s"></div>
+                <div class="waveform-bar" style="height:10px;animation-delay:.7s"></div>
+                <div class="waveform-bar" style="height:6px;animation-delay:.8s"></div>
+              </div>
+            </div>
+
+            <!-- Extracted fields preview -->
+            <div id="extracted-row" style="display:none;">
+              <div style="font-family:var(--font-m);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">AI Extracted</div>
+              <div id="extracted-chips"></div>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-primary btn-sm" id="process-btn" onclick="processWithAI()" style="display:none;">
+                Fill Form with AI
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="clearVoice()" id="clear-btn" style="display:none;">
+                Clear
+              </button>
+              <span id="ai-status" style="font-family:var(--font-m);font-size:11px;color:var(--text3);"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Example phrases -->
+        <div>
+          <div style="font-family:var(--font-m);font-size:9px;color:var(--text4);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">
+            Example phrases — tap to use
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="phrase-grid">
+            <div class="phrase-card" onclick="usePhrase(this.textContent)">
+              "TBM advance kiya 14 metre, 9 ghante kaam kiya, crew 12 log, koi issue nahi"
+            </div>
+            <div class="phrase-card" onclick="usePhrase(this.textContent)">
+              "Concrete pouring done, 120 cubic metres, 8 hours, slight rain, no issues"
+            </div>
+            <div class="phrase-card" onclick="usePhrase(this.textContent)">
+              "Pile boring, 4 piles completed, 8 hours, equipment broke down once"
+            </div>
+            <div class="phrase-card" onclick="usePhrase(this.textContent)">
+              "Rebar fixing 22 MT, 9.5 hours, crew of 12, clear weather, all good"
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── FORM ─────────────────────────────────────────── -->
+      <div class="card fade-up">
+        <div class="card-title" style="margin-bottom:16px;">Review and Submit</div>
+
+        <form method="POST" action="/worker-update" id="update-form">
+          <input type="hidden" name="user_id" id="f-uid" value="{{ user.id if user else 1 }}">
+
+          <div class="form-group">
+            <label class="form-label">Worker Name</label>
+            <input class="form-input" type="text" name="worker_name" id="f-worker"
+                   value="{{ user.name if user else '' }}" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Activity</label>
+            <select class="form-select" name="activity_id" id="f-activity" required>
+              <option value="">— Select Activity —</option>
+              {% for a in activities %}
+              <option value="{{ a.id }}">{{ a.name }} ({{ a.activity_type }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Work Type</label>
+            <select class="form-select" name="work_type" id="f-worktype" required>
+              <option value="">— Select —</option>
+              <option>TBM Advance</option>
+              <option>Excavation</option>
+              <option>Concrete Pouring</option>
+              <option>Rebar Fixing</option>
+              <option>Pile Boring</option>
+              <option>Shuttering</option>
+              <option>Survey</option>
+              <option>Inspection</option>
+              <option>Waterproofing</option>
+              <option>Backfilling</option>
+              <option>Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Work Description</label>
+            <textarea class="form-textarea" name="work_description" id="f-desc"
+                      placeholder="Describe the work done..." rows="3"></textarea>
+          </div>
+
+          <div class="g2" style="gap:12px;">
+            <div class="form-group">
+              <label class="form-label">Quantity Done</label>
+              <input class="form-input" type="number" name="quantity_done" id="f-qty"
+                     step="0.01" min="0" placeholder="e.g. 12.5" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Unit</label>
+              <select class="form-select" name="quantity_unit" id="f-unit">
+                <option>m</option>
+                <option>km</option>
+                <option>m3</option>
+                <option>MT</option>
+                <option>no</option>
+                <option>kg</option>
+                <option>sqm</option>
+              </select>
             </div>
           </div>
 
-          <!-- Tips -->
-          <div class="card fade-up" style="background:rgba(245,166,35,.04);border-color:rgba(245,166,35,.2);">
-            <div class="card-title" style="color:var(--accent);">💡 Tips</div>
-            <ul style="font-size:12px;color:var(--text3);line-height:2;padding-left:16px;margin-top:8px;">
-              <li>Submit updates at end of each shift</li>
-              <li>Always report issues — even minor ones</li>
-              <li>Accurate qty helps the Digital Twin</li>
-              <li>Use ✦ AI Update for voice/text input</li>
-            </ul>
+          <div class="g2" style="gap:12px;">
+            <div class="form-group">
+              <label class="form-label">Hours Worked</label>
+              <input class="form-input" type="number" name="hours_worked" id="f-hours"
+                     step="0.5" min="0" max="18" placeholder="e.g. 8" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Crew Size</label>
+              <input class="form-input" type="number" name="crew_size" id="f-crew"
+                     min="1" max="100" placeholder="e.g. 10" value="5">
+            </div>
           </div>
 
-        </div>
+          <div class="form-group">
+            <label class="form-label">Weather Condition</label>
+            <select class="form-select" name="weather_condition" id="f-weather">
+              <option>Clear</option>
+              <option>Cloudy</option>
+              <option>Rain</option>
+              <option>Heavy Rain</option>
+              <option>Fog</option>
+              <option>Extreme Heat</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Issue Reported</label>
+            <select class="form-select" name="issue_type" id="f-issue">
+              <option value="None">None</option>
+              <option value="Equipment Breakdown">Equipment Breakdown</option>
+              <option value="Material Delay">Material Delay</option>
+              <option value="Labour Shortage">Labour Shortage</option>
+              <option value="Safety Concern">Safety Concern</option>
+              <option value="Weather">Weather Delay</option>
+              <option value="Design Change">Design Change</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+              <input type="checkbox" name="safety_ok" value="true" checked id="f-safety"
+                     style="width:16px;height:16px;accent-color:var(--green);">
+              <span>Safety checks passed for today</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;">
+            Submit Update
+          </button>
+        </form>
       </div>
 
     </div>
@@ -195,53 +454,370 @@
 </div>
 
 <script>
-var USER_ID = parseInt(document.body.dataset.uid || '1', 10);
+var USER_ID   = parseInt(document.body.dataset.uid   || '1',  10);
+var USER_NAME = document.body.dataset.uname || '';
+var LANG      = 'en-IN';
+var recognition = null;
+var isRecording = false;
+var currentTranscript = '';
 
-/* Clock */
+// ── Clock & shift ─────────────────────────────────────────
 setInterval(function() {
   document.getElementById('clock').textContent =
     new Date().toLocaleTimeString('en-IN', {hour12:false}) + ' IST';
 }, 1000);
 
-/* Shift badge */
 var h = new Date().getHours();
-var shift, shiftColor, shiftTime;
-if (h >= 6 && h < 14) {
-  shift='🌅 Morning Shift'; shiftColor='var(--accent)'; shiftTime='06:00 – 14:00';
-} else if (h >= 14 && h < 22) {
-  shift='☀️ Day Shift'; shiftColor='var(--accent2)'; shiftTime='14:00 – 22:00';
-} else {
-  shift='🌙 Night Shift'; shiftColor='var(--purple)'; shiftTime='22:00 – 06:00';
-}
-document.getElementById('shift-badge').textContent = shift;
-document.getElementById('shift-badge').style.color = shiftColor;
-document.getElementById('shift-time').textContent = shiftTime;
+var shift = h >= 6 && h < 14 ? 'Morning Shift' : h >= 14 && h < 22 ? 'Day Shift' : 'Night Shift';
+document.getElementById('shift-label').textContent = shift;
 
-/* Load recent updates */
-fetch('/api/updates?limit=5&worker_name=' + encodeURIComponent(document.body.dataset.uname))
-  .then(function(r){ return r.json(); })
-  .then(function(data) {
-    var cont = document.getElementById('recent-updates');
-    if (!data.length) {
-      cont.innerHTML = '<p style="color:var(--text3);font-size:12px;">No submissions yet.</p>';
+// ── Language toggle ───────────────────────────────────────
+function setLang(lang) {
+  LANG = lang;
+  document.getElementById('lang-en').classList.toggle('selected', lang === 'en-IN');
+  document.getElementById('lang-hi').classList.toggle('selected', lang === 'hi-IN');
+}
+
+// ── Web Speech API ────────────────────────────────────────
+function toggleRecording() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    setStatus('error', 'Voice not supported in this browser. Use Chrome.');
+    return;
+  }
+  if (isRecording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+function startRecording() {
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.lang          = LANG;
+  recognition.continuous    = true;
+  recognition.interimResults= true;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = function() {
+    isRecording = true;
+    var btn = document.getElementById('mic-btn');
+    btn.classList.add('recording');
+    document.getElementById('ring1').style.display = 'block';
+    document.getElementById('ring2').style.display = 'block';
+    document.getElementById('waveform-row').style.display = 'block';
+    animateWaveform();
+    setStatus('recording', 'Listening... speak now');
+    var tb = document.getElementById('transcript-box');
+    tb.classList.add('active');
+    tb.textContent = '';
+  };
+
+  recognition.onresult = function(event) {
+    var interim = '';
+    var final   = '';
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      var t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) { final += t; }
+      else                          { interim += t; }
+    }
+    currentTranscript = (currentTranscript + ' ' + final).trim();
+    var tb = document.getElementById('transcript-box');
+    tb.textContent = currentTranscript + (interim ? ' ' + interim : '');
+    if (currentTranscript) {
+      tb.classList.add('has-text');
+      document.getElementById('process-btn').style.display = 'inline-flex';
+      document.getElementById('clear-btn').style.display   = 'inline-flex';
+    }
+  };
+
+  recognition.onerror = function(e) {
+    if (e.error === 'no-speech') {
+      setStatus('idle', 'No speech detected. Try again.');
+    } else if (e.error === 'not-allowed') {
+      setStatus('error', 'Microphone permission denied.');
+    } else {
+      setStatus('error', 'Error: ' + e.error);
+    }
+    stopRecording();
+  };
+
+  recognition.onend = function() {
+    if (isRecording) {
+      // Restart for continuous listening
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+
+  recognition.start();
+}
+
+function stopRecording() {
+  isRecording = false;
+  if (recognition) { try { recognition.stop(); } catch(e) {} }
+  var btn = document.getElementById('mic-btn');
+  btn.classList.remove('recording');
+  document.getElementById('ring1').style.display = 'none';
+  document.getElementById('ring2').style.display = 'none';
+  document.getElementById('waveform-row').style.display = 'none';
+  var tb = document.getElementById('transcript-box');
+  tb.classList.remove('active');
+  if (currentTranscript) {
+    setStatus('idle', 'Tap "Fill Form with AI" to extract fields');
+  } else {
+    setStatus('idle', 'Ready');
+  }
+}
+
+function animateWaveform() {
+  if (!isRecording) return;
+  var bars = document.querySelectorAll('.waveform-bar');
+  bars.forEach(function(bar) {
+    var h = Math.floor(Math.random() * 26) + 4;
+    bar.style.height = h + 'px';
+  });
+  if (isRecording) setTimeout(animateWaveform, 120);
+}
+
+// ── Use example phrase ────────────────────────────────────
+function usePhrase(text) {
+  currentTranscript = text.replace(/"/g, '').trim();
+  var tb = document.getElementById('transcript-box');
+  tb.textContent = currentTranscript;
+  tb.classList.add('has-text');
+  document.getElementById('process-btn').style.display = 'inline-flex';
+  document.getElementById('clear-btn').style.display   = 'inline-flex';
+  setStatus('idle', 'Tap "Fill Form with AI" to extract fields');
+}
+
+// ── AI extraction via Groq ────────────────────────────────
+async function processWithAI() {
+  if (!currentTranscript) return;
+
+  var btn = document.getElementById('process-btn');
+  btn.textContent = 'Extracting...';
+  btn.disabled    = true;
+  document.getElementById('mic-btn').classList.add('processing');
+  setStatus('processing', 'AI is reading your update...');
+  document.getElementById('ai-status').textContent = '';
+
+  // Get activity names for context
+  var activityOptions = [];
+  var actSel = document.getElementById('f-activity');
+  for (var i = 1; i < actSel.options.length; i++) {
+    activityOptions.push(actSel.options[i].text);
+  }
+
+  var prompt = 'You are a construction site data extractor. A worker has spoken this update:\n\n"' + currentTranscript + '"\n\nExtract the following fields and return ONLY valid JSON, no markdown, no explanation:\n{\n  "work_type": "one of: TBM Advance, Excavation, Concrete Pouring, Rebar Fixing, Pile Boring, Shuttering, Survey, Inspection, Waterproofing, Backfilling, Other",\n  "quantity_done": <number or null>,\n  "quantity_unit": "one of: m, km, m3, MT, no, kg, sqm",\n  "hours_worked": <number or null>,\n  "crew_size": <number or null>,\n  "weather_condition": "one of: Clear, Cloudy, Rain, Heavy Rain, Fog, Extreme Heat",\n  "issue_type": "one of: None, Equipment Breakdown, Material Delay, Labour Shortage, Safety Concern, Weather, Design Change, Other",\n  "work_description": "<1-2 sentence summary of work done>",\n  "activity_hint": "<keyword from activity name if mentioned, else empty string>"\n}\n\nAvailable activities: ' + activityOptions.join(', ') + '\n\nRules:\n- If worker says "ghante" it means hours in Hindi\n- "metre" or "meter" = unit m\n- "cubic" or "m3" = unit m3\n- "log" means crew members in Hindi\n- "koi issue nahi" = issue_type None\n- "equipment toot gaya" or "machine bandh" = Equipment Breakdown\n- If unclear, use null for numbers';
+
+  try {
+    var response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message:    prompt,
+        user_id:    USER_ID,
+        session_id: 'voice_extract_' + Date.now(),
+        history:    []
+      })
+    });
+
+    var data = await response.json();
+    var raw  = data.reply || '';
+
+    // Strip markdown fences if present
+    raw = raw.replace(/```json/g,'').replace(/```/g,'').trim();
+
+    var extracted = JSON.parse(raw);
+    fillForm(extracted);
+
+  } catch(e) {
+    // Fallback: basic regex extraction
+    setStatus('idle', 'AI unavailable — using basic extraction');
+    basicExtract(currentTranscript);
+  }
+
+  btn.textContent = 'Fill Form with AI';
+  btn.disabled    = false;
+  document.getElementById('mic-btn').classList.remove('processing');
+}
+
+function fillForm(data) {
+  var filled = [];
+
+  if (data.work_type) {
+    setSelect('f-worktype', data.work_type);
+    filled.push('Work Type: ' + data.work_type);
+  }
+  if (data.quantity_done !== null && data.quantity_done !== undefined) {
+    flashField('f-qty');
+    document.getElementById('f-qty').value = data.quantity_done;
+    filled.push('Qty: ' + data.quantity_done);
+  }
+  if (data.quantity_unit) {
+    setSelect('f-unit', data.quantity_unit);
+    filled.push('Unit: ' + data.quantity_unit);
+  }
+  if (data.hours_worked !== null && data.hours_worked !== undefined) {
+    flashField('f-hours');
+    document.getElementById('f-hours').value = data.hours_worked;
+    filled.push('Hours: ' + data.hours_worked + 'h');
+  }
+  if (data.crew_size !== null && data.crew_size !== undefined) {
+    flashField('f-crew');
+    document.getElementById('f-crew').value = data.crew_size;
+    filled.push('Crew: ' + data.crew_size);
+  }
+  if (data.weather_condition) {
+    setSelect('f-weather', data.weather_condition);
+    filled.push('Weather: ' + data.weather_condition);
+  }
+  if (data.issue_type) {
+    setSelect('f-issue', data.issue_type);
+    filled.push('Issue: ' + data.issue_type);
+  }
+  if (data.work_description) {
+    flashField('f-desc');
+    document.getElementById('f-desc').value = data.work_description;
+    filled.push('Description filled');
+  }
+
+  // Try to match activity hint
+  if (data.activity_hint) {
+    var hint = data.activity_hint.toLowerCase();
+    var actSel = document.getElementById('f-activity');
+    for (var i = 1; i < actSel.options.length; i++) {
+      if (actSel.options[i].text.toLowerCase().includes(hint)) {
+        actSel.value = actSel.options[i].value;
+        actSel.classList.add('ai-filled');
+        setTimeout(function() { actSel.classList.remove('ai-filled'); }, 2000);
+        filled.push('Activity matched');
+        break;
+      }
+    }
+  }
+
+  // Show extracted chips
+  if (filled.length) {
+    var row   = document.getElementById('extracted-row');
+    var chips = document.getElementById('extracted-chips');
+    row.style.display = 'block';
+    chips.innerHTML = filled.map(function(f) {
+      return '<span class="extracted-chip">+ ' + f + '</span>';
+    }).join('');
+    setStatus('done', filled.length + ' fields filled — review and submit');
+  }
+}
+
+function flashField(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('ai-filled');
+  setTimeout(function() { el.classList.remove('ai-filled'); }, 2000);
+}
+
+function setSelect(id, value) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  for (var i = 0; i < el.options.length; i++) {
+    if (el.options[i].value === value || el.options[i].text === value) {
+      el.value = el.options[i].value;
+      el.classList.add('ai-filled');
+      setTimeout(function(e) { e.classList.remove('ai-filled'); }, 2000, el);
       return;
     }
-    cont.innerHTML = data.slice(0,5).map(function(u) {
-      var hasIssue = u.issue_type && u.issue_type.toLowerCase() !== 'none';
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);">' +
-        '<div>' +
-          '<div style="font-size:12px;font-weight:600;">' + u.work_type + '</div>' +
-          '<div style="font-family:var(--font-m);font-size:10px;color:var(--text3);">' +
-            u.quantity_done + u.quantity_unit + ' · ' + u.hours_worked + 'h' +
-          '</div>' +
-        '</div>' +
-        '<span class="badge ' + (hasIssue ? 'badge-red' : 'badge-green') + '" style="font-size:9px;">' +
-          (hasIssue ? '⚠' : '✓') +
-        '</span>' +
-      '</div>';
-    }).join('');
-  })
-  .catch(function(){ document.getElementById('recent-updates').innerHTML='<p style="color:var(--text3);font-size:12px;">Could not load.</p>'; });
+  }
+}
+
+// ── Basic fallback extractor ──────────────────────────────
+function basicExtract(text) {
+  var t = text.toLowerCase();
+  var data = {};
+
+  // Hours
+  var hoursMatch = t.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|ghante?|hour)/);
+  if (hoursMatch) data.hours_worked = parseFloat(hoursMatch[1]);
+
+  // Quantity — number before unit
+  var qtyMatch = t.match(/(\d+(?:\.\d+)?)\s*(?:metre|meter|m\b|m3|cubic|mt\b|tons?|no\b|piles?)/);
+  if (qtyMatch) data.quantity_done = parseFloat(qtyMatch[1]);
+
+  // Unit
+  if (t.includes('cubic') || t.includes('m3')) data.quantity_unit = 'm3';
+  else if (t.includes('mt') || t.includes('ton')) data.quantity_unit = 'MT';
+  else if (t.includes('no') || t.includes('pile')) data.quantity_unit = 'no';
+  else data.quantity_unit = 'm';
+
+  // Crew
+  var crewMatch = t.match(/(\d+)\s*(?:log|crew|worker|people|person)/);
+  if (crewMatch) data.crew_size = parseInt(crewMatch[1]);
+
+  // Work type
+  if (t.includes('tbm') || t.includes('tunnel')) data.work_type = 'TBM Advance';
+  else if (t.includes('concrete') || t.includes('pour')) data.work_type = 'Concrete Pouring';
+  else if (t.includes('rebar') || t.includes('steel')) data.work_type = 'Rebar Fixing';
+  else if (t.includes('pile') || t.includes('boring')) data.work_type = 'Pile Boring';
+  else if (t.includes('excavat')) data.work_type = 'Excavation';
+  else if (t.includes('survey')) data.work_type = 'Survey';
+
+  // Weather
+  if (t.includes('rain') && t.includes('heavy')) data.weather_condition = 'Heavy Rain';
+  else if (t.includes('rain') || t.includes('baarish')) data.weather_condition = 'Rain';
+  else if (t.includes('fog') || t.includes('dhund')) data.weather_condition = 'Fog';
+  else if (t.includes('hot') || t.includes('garmi')) data.weather_condition = 'Extreme Heat';
+  else if (t.includes('cloud')) data.weather_condition = 'Cloudy';
+  else data.weather_condition = 'Clear';
+
+  // Issues
+  if (t.includes('equipment') || t.includes('machine') || t.includes('breakdown')) {
+    data.issue_type = 'Equipment Breakdown';
+  } else if (t.includes('safety') || t.includes('accident')) {
+    data.issue_type = 'Safety Concern';
+  } else if (t.includes('material') || t.includes('delay')) {
+    data.issue_type = 'Material Delay';
+  } else {
+    data.issue_type = 'None';
+  }
+
+  data.work_description = text;
+  fillForm(data);
+}
+
+function clearVoice() {
+  currentTranscript = '';
+  if (isRecording) stopRecording();
+  var tb = document.getElementById('transcript-box');
+  tb.textContent = 'Tap the microphone and describe your work...';
+  tb.classList.remove('active', 'has-text');
+  document.getElementById('process-btn').style.display = 'none';
+  document.getElementById('clear-btn').style.display   = 'none';
+  document.getElementById('extracted-row').style.display = 'none';
+  setStatus('idle', 'Ready');
+}
+
+function setStatus(state, msg) {
+  var el  = document.getElementById('voice-status');
+  var colors = { idle:'var(--text4)', recording:'var(--red)', processing:'var(--orange)', done:'var(--green)', error:'var(--red)' };
+  var col = colors[state] || 'var(--text4)';
+  el.innerHTML = '<div class="status-dot" style="background:' + col + ';"></div><span style="color:' + col + ';">' + msg + '</span>';
+}
+
+function toggleSidebar() {
+  var layout = document.querySelector('.app-layout');
+  layout.classList.toggle('sidebar-collapsed');
+}
+
+// ── Browser support check ─────────────────────────────────
+window.onload = function() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    document.getElementById('mic-btn').disabled = true;
+    document.getElementById('mic-btn').style.opacity = '.4';
+    setStatus('error', 'Use Chrome/Edge for voice support');
+  } else {
+    setStatus('idle', 'Ready — tap mic to speak');
+  }
+  document.getElementById('f-worker').value = USER_NAME || document.getElementById('f-worker').value;
+};
 </script>
 <script src="/static/chatbot.js"></script>
 </body>

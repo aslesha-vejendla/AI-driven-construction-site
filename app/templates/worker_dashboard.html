@@ -20,12 +20,21 @@
 .activity-item:last-child{border-bottom:none}
 </style>
 </head>
-<body data-uid="{{ user.id if user else 1 }}" data-uname="{{ user.name if user else 'Worker' }}">
-<div class="dashboard-shell">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
-    <div>
-      <div class="welcome-title">Welcome, <span id="wname">{{ user.name if user else 'Worker' }}</span></div>
-      <div class="welcome-sub" id="wdate"></div>
+<body data-uid="{{ user.id if user else 1 }}"
+      data-uname="{{ user.name if user else 'Worker' }}">
+
+<div class="app-layout">
+  {{ sidebar(user, 'dash', 'worker') }}
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">
+        <span style="color:var(--accent);">👷</span> Worker Dashboard
+      </div>
+      <div class="topbar-right">
+        <span id="clock" style="font-family:var(--font-m);font-size:11px;color:var(--text3);letter-spacing:.5px;"></span>
+        <a href="/update-work" id="manual-link" class="btn btn-primary btn-sm">+ Add Update</a>
+      </div>
     </div>
     <div>
       <span id="clock" style="font-size:.95rem;color:var(--text2);"></span>
@@ -49,11 +58,19 @@
     <div class="stat-card"><div class="stat-lbl">Qty Done</div><div class="stat-val" id="my-qty">—</div></div>
   </div>
 
-  <div class="quick-actions">
-    <a class="qa-card" id="submit-link" href="#"><div class="qa-title">Submit Work Update</div><div class="qa-sub">Quickly log quantity, hours, and issues.</div></a>
-    <a class="qa-card" id="handover-link" href="#"><div class="qa-title">Shift Handover</div><div class="qa-sub">Share concise status with the next shift.</div></a>
-    <a class="qa-card" id="monitor-link" href="#"><div class="qa-title">Site Monitor</div><div class="qa-sub">Check live activity and safety context.</div></a>
-  </div>
+      <!-- Quick actions -->
+      <div class="quick-actions fade-up">
+        <a class="qa-card" id="qa-manual" href="#">
+          <span class="qa-icon">📝</span>
+          <div class="qa-label">Submit Update</div>
+          <div class="qa-desc">Voice-assisted manual update; field suggestion included</div>
+        </a>
+        <a class="qa-card" id="qa-handover" href="#">
+          <span class="qa-icon">🔄</span>
+          <div class="qa-label">Shift Handover</div>
+          <div class="qa-desc">End-of-shift briefing with AI summary</div>
+        </a>
+      </div>
 
   <div class="g2">
     <div class="card">
@@ -75,21 +92,32 @@
 <script>
 var USER_ID   = parseInt(document.body.dataset.uid   || '1', 10);
 var USER_NAME = document.body.dataset.uname || 'Worker';
-[
-  ['manual-link','/update-work?user_id='],
-  ['submit-link','/update-work?user_id='],
-  ['qa-manual','/update-work?user_id='],
-  ['qa-handover','/handover?user_id='],
-  ['handover-link','/handover?user_id='],
-  ['monitor-link','/monitor?user_id='],
-  ['link-monitor','/monitor?user_id='],
-  ['link-profile','/profile?user_id='],
-  ['link-dashboard','/worker-dashboard?user_id=']
-].forEach(function(item){ var el=document.getElementById(item[0]); if(el) el.href=item[1]+USER_ID; });
+window.CTWIN_USER_ID = USER_ID;
 
-document.getElementById('wname').textContent = USER_NAME;
-document.getElementById('wdate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-setInterval(function() { document.getElementById('clock').textContent = new Date().toLocaleString(); }, 1000);
+/* Fix links with user_id */
+document.getElementById('manual-link').href   = '/update-work?user_id='   + USER_ID;
+if (document.getElementById('qa-manual')) {
+  document.getElementById('qa-manual').href     = '/update-work?user_id='   + USER_ID;
+}
+document.getElementById('qa-handover').href   = '/handover?user_id='      + USER_ID;
+document.getElementById('submit-link').href   = '/update-work?user_id='   + USER_ID;
+
+/* Welcome */
+document.getElementById('wname').textContent = USER_NAME.split(' ')[0];
+var now = new Date();
+document.getElementById('wdate').textContent =
+  now.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+var hr = now.getHours();
+document.getElementById('shift-indicator').textContent =
+  hr >= 6 && hr < 14 ? '🌅 Morning Shift' :
+  hr >= 14 && hr < 22 ? '☀️ Day Shift' : '🌙 Night Shift';
+
+/* Clock */
+setInterval(function() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN',{hour12:false}) + ' IST';
+}, 1000);
 
 async function loadStats() {
   try {

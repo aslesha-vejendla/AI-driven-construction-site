@@ -4,52 +4,53 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ELIS Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0f1e; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; padding: 24px; }
-    h1 { color: #22d3ee; font-size: 1.6rem; margin-bottom: 20px; }
+    body { background: #FFFFFF; color: #0F1419; font-family: 'Inter', sans-serif; padding: 24px; }
+    h1 { color: #2A5298; font-size: 1.6rem; margin-bottom: 20px; font-family: 'Fraunces', serif; }
 
     .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; }
+    .stat-card { background: #FFFFFF; border: 2px solid #DCEAFF; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(42, 82, 152, 0.08); }
     .stat-card .num { font-size: 2rem; font-weight: bold; }
-    .stat-card .lbl { color: #6b7280; font-size: 0.8rem; margin-top: 4px; }
-    .cyan  { color: #22d3ee; }
-    .red   { color: #ef4444; }
-    .amber { color: #f59e0b; }
-    .green { color: #22c55e; }
+    .stat-card .lbl { color: #4A5F8A; font-size: 0.8rem; margin-top: 4px; }
+    .cyan  { color: #2A5298; }
+    .red   { color: #DC2626; }
+    .amber { color: #D97706; }
+    .green { color: #16A34A; }
 
     .grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
-    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; }
-    .card h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin-bottom: 12px; }
+    .card { background: #FFFFFF; border: 2px solid #DCEAFF; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(42, 82, 152, 0.08); }
+    .card h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #4A5F8A; margin-bottom: 12px; }
 
     .event-stream { max-height: 300px; overflow-y: auto; }
     .event-row { display: grid; grid-template-columns: 80px 20px 160px 1fr auto; gap: 8px;
-                 align-items: start; padding: 6px 0; border-bottom: 1px solid #1f2937;
-                 font-family: monospace; font-size: 0.78rem; }
-    .event-row .time { color: #4b5563; }
-    .event-row .type { color: #c084fc; }
-    .event-row .msg  { color: #d1d5db; }
-    .ml-badge { background: #1f2937; color: #22d3ee; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; white-space: nowrap; }
+                 align-items: start; padding: 6px 0; border-bottom: 1px solid #DCEAFF;
+                 font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+    .event-row .time { color: #6B7280; }
+    .event-row .type { color: #2A5298; }
+    .event-row .msg  { color: #1A2332; }
+    .ml-badge { background: #EBF4FD; color: #2A5298; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; white-space: nowrap; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th { color: #6b7280; font-size: 0.7rem; text-transform: uppercase; text-align: left;
-         padding: 8px 12px; border-bottom: 1px solid #1f2937; }
-    td { padding: 10px 12px; border-bottom: 1px solid #1f2937; }
+    th { color: #4A5F8A; font-size: 0.7rem; text-transform: uppercase; text-align: left;
+         padding: 8px 12px; border-bottom: 2px solid #DCEAFF; background: #F9FBFF; }
+    td { padding: 10px 12px; border-bottom: 1px solid #DCEAFF; color: #1A2332; }
     .badge { padding: 3px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: bold; }
-    .HIGH     { background: #450a0a; color: #fca5a5; }
-    .ELEVATED { background: #431407; color: #fdba74; }
-    .MEDIUM   { background: #422006; color: #fcd34d; }
-    .LOW      { background: #052e16; color: #86efac; }
+    .HIGH     { background: #FEE2E2; color: #DC2626; }
+    .ELEVATED { background: #FEF3C7; color: #D97706; }
+    .MEDIUM   { background: #FEF3C7; color: #D97706; }
+    .LOW      { background: #DCFCE7; color: #16A34A; }
 
     .btn-row { display: flex; gap: 12px; margin-top: 20px; }
     button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
-    .btn-train   { background: #7c3aed; color: white; }
-    .btn-refresh { background: #374151; color: white; }
+    .btn-train   { background: #2A5298; color: white; }
+    .btn-refresh { background: #F9FBFF; color: #1A2332; border: 1px solid #DCEAFF; }
     button:hover { opacity: 0.85; }
 
     .filter-row { display: flex; gap: 10px; margin-bottom: 12px; }
-    select { background: #1f2937; color: #e2e8f0; border: 1px solid #374151;
+    select { background: #FFFFFF; color: #0F1419; border: 1px solid #DCEAFF;
              padding: 6px 10px; border-radius: 6px; font-size: 0.82rem; }
   </style>
 </head>
@@ -78,7 +79,7 @@
       </select>
     </div>
     <div class="event-stream" id="event-stream">
-      <p style="color:#4b5563">Loading...</p>
+      <p style="color:#6B7280">Loading...</p>
     </div>
   </div>
 
@@ -103,7 +104,7 @@
   <button class="btn-train"   onclick="trainModel()">🧠 Train ML Model</button>
   <button class="btn-refresh" onclick="fetchAll()">↻ Refresh</button>
   <a href="/dews-dashboard?user_id={{ user.id if user else 1 }}"
-     style="padding:10px 20px;background:#1f2937;color:#e2e8f0;border-radius:8px;text-decoration:none;font-size:0.85rem;">
+     style="padding:10px 20px;background:#F9FBFF;color:#1A2332;border:1px solid #DCEAFF;border-radius:8px;text-decoration:none;font-size:0.85rem;">
     ← Back to DEWS
   </a>
 </div>
@@ -119,7 +120,7 @@ async function fetchEvents() {
   const stream = document.getElementById("event-stream");
 
   if (!events.length) {
-    stream.innerHTML = '<p style="color:#4b5563;font-size:0.8rem">No events yet. Submit a worker update to generate events.</p>';
+    stream.innerHTML = '<p style="color:#6B7280;font-size:0.8rem">No events yet. Submit a worker update to generate events.</p>';
     return;
   }
 
@@ -149,7 +150,7 @@ async function fetchStats() {
   pieChart = new Chart(document.getElementById("pieChart"), {
     type: "pie",
     data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }] },
-    options: { plugins: { legend: { labels: { color: "#9ca3af" } } } }
+    options: { plugins: { legend: { labels: { color: "#4A5F8A" } } } }
   });
 }
 
@@ -157,7 +158,7 @@ async function fetchRisk() {
   const risks = await fetch("/api/elis/worker-risk").then(r => r.json());
   const tbody = document.getElementById("risk-table");
   if (!risks.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:#4b5563">No worker data yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#6B7280">No worker data yet.</td></tr>';
     return;
   }
   tbody.innerHTML = risks.map(r => `

@@ -370,4 +370,25 @@
       .replace(/\n/g, '<br>');
   }
 
+  /* ── Sidebar toggle (available globally if sidebar exists) ─────────────────── */
+  function sidebarToggle() {
+    var layout = document.querySelector('.app-layout');
+    if (!layout) return;
+    layout.classList.toggle('sidebar-collapsed');
+    localStorage.setItem('ctwin_sidebar_collapsed', layout.classList.contains('sidebar-collapsed') ? '1' : '0');
+  }
+
+  function initSidebarToggle() {
+    var button = document.getElementById('sidebar-toggle');
+    if (!button) return;
+    button.addEventListener('click', sidebarToggle);
+    var layout = document.querySelector('.app-layout');
+    if (!layout) return;
+    if (localStorage.getItem('ctwin_sidebar_collapsed') === '1') {
+      layout.classList.add('sidebar-collapsed');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initSidebarToggle);
+
 })();

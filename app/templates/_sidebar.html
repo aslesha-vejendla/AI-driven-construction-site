@@ -1,9 +1,10 @@
 {% macro sidebar(user, active, role) %}
 <div class="sidebar">
 
-  <!-- Logo -->
-  <div class="sidebar-logo">
-    <div class="logo-brand">
+  <!-- Logo + collapse control -->
+  <div class="sidebar-logo" style="position:relative;">
+    <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Toggle sidebar">☰</button>
+    <div class="logo-brand" style="margin-left: 34px;">
       <div class="logo-mark">CE</div>
       <div>
         <div style="font-family:var(--font-d);font-size:14px;font-weight:800;color:var(--text);line-height:1.2;">Construction Ease</div>
@@ -147,15 +148,6 @@
         <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
       </svg>
       <span>Dashboard</span>
-    </a>
-
-    <a href="/smart-update?user_id={{ user.id if user else 1 }}"
-       class="nav-link {% if active == 'smart' %}active{% endif %}">
-      <svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-      </svg>
-      <span>Smart Update AI</span>
-      <span class="nav-tag nav-tag-blue">AI</span>
     </a>
 
     <a href="/update-work?user_id={{ user.id if user else 1 }}"
